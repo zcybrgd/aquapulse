@@ -70,7 +70,7 @@ The AIA operates as a structured pipeline, transitioning from high-volume determ
 
 ### Stage 2: Anomaly Investigation (Agentic Disambiguation)
 *   **Information Processed:** Suspicious telemetry sequences, real-time edge gateway status, and environmental variables.
-*   **Reasoning/Analysis:** This stage distinguishes between a physical pipe burst and a sensor going offline or transmitting garbage data due to extreme desert heat. The agent invokes the Nokia NaC **CAMARA Device Status** and **Device Reachability** APIs to examine physical connection parameters. If the device is reported as disconnected or unreachable by the network while local temperatures exceed 50°C, the agent cross-references historical regional signal degradation profiles to diagnose thermal base-station degradation.
+*   **Reasoning/Analysis:** This stage distinguishes between a physical pipe burst and a sensor going offline or transmitting garbage data due to extreme desert heat. The agent invokes the Nokia NaC **CAMARA Device Reachability Status** API to examine physical connection parameters. If the device is reported as disconnected or unreachable by the network while local temperatures exceed 50°C, the agent cross-references historical regional signal degradation profiles to diagnose thermal base-station degradation.
 *   **Required Data:** Nokia NaC integration tokens, CAMARA Device API endpoints, and historical network health patterns.
 *   **Deliverable:** Investigation status classification: `confirmed_anomaly` (reachable network, drop in pressure), `likely_connectivity_artifact` (unreachable network under extreme heat), or `insufficient_data` (unstable or fluctuating reachability).
 
