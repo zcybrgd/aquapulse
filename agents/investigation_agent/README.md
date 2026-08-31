@@ -82,17 +82,3 @@ python -m pytest tests/ -v  # 20 tests, including all 5 target simulation scenar
   injected too — pass `None` to use the deterministic template narrator, or
   an `anthropic.Anthropic()` instance for live LLM narration
   (`ANTHROPIC_API_KEY` env var).
-
-## What's intentionally out of scope
-
-This implements the **AIA** as specified. The downstream **Network
-Management Agent (NMA)**, the CAMARA QoD/Slicing negotiation, and the
-physical valve actuator integration (Section 8) are consumers of this
-agent's output payload, not part of it — the AIA's job ends at emitting a
-validated `AIABatchOutputPayload`.
-
-The `HttpCamaraClient` and `TimescaleDBStore`/`RedisTopologyCache`
-implementations are wired to real APIs/services but haven't been run
-against a live Nokia NaC sandbox or a live TimescaleDB instance in this
-environment; per Section 9 Phase 1, validate exact JSON schemas and
-endpoint paths against the live sandbox before depending on them.
