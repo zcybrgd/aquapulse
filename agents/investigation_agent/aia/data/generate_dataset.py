@@ -59,6 +59,26 @@ def _maybe_add_transient(p: float, q: float, prob: float = 0.04) -> tuple[float,
     return p, q
 
 
+# non-gaussian sensor artifacts (applied uniformly to ALL scenarios)
+def _apply_sensor_artifacts(readings: list[dict]) -> list[dict]:
+    n = len(readings)
+    # Sensor sticking: 5% chance the sensor freezes for 2-3 consecutive readings
+    if random.random() < 0.05:
+        stick_start = random.randint(0, max(0, n - 3))
+        stick_len = random.randint(2, 3)
+        stuck_p = readings[stick_start]["pressure_psi"]
+        stuck_q = readings[stick_start]["flow_rate_lps"]
+        for j in range(stick_start, min(stick_start + stick_len, n)):
+            readings[j]["pressure_psi"] = stuck_p
+            readings[j]["flow_rate_lps"] = stuck_q
+    # Spikes: each reading has a 3% chance of a sudden jump
+    for i in range(n):
+        if random.random() < 0.03:
+            spike = np.random.uniform(3.0, 8.0) * np.random.choice([-1, 1])
+            readings[i]["pressure_psi"] = max(0, readings[i]["pressure_psi"] + spike)
+    return readings
+
+
 # time-series generators
 def _generate_normal_series(base_p: float, base_q: float, temp: float,
                             sensor: dict, age: int) -> list[dict]:
@@ -80,13 +100,16 @@ def _generate_normal_series(base_p: float, base_q: float, temp: float,
             "flow_rate_lps": max(0, q),
             "ambient_temp_c": temp + np.random.normal(0, 0.3),
         })
-    return readings
+    return _apply_sensor_artifacts(readings)
 
-# look suspicious but not considered as leak(to make sure that our model is  robust)
+# look suspicious but not considered as leak (for robustness)
 def _generate_ambiguous_series(base_p: float, base_q: float, temp: float,
                                sensor: dict, age: int) -> list[dict]:
     readings = []
-    scenario = random.choice(["demand_shift", "pump_cycle", "valve_opening"])
+    scenario = random.choice([
+        "demand_shift", "pump_cycle", "valve_opening",
+        "construction_vibration", "scheduled_purge", "meter_drift",
+    ])
 
     for i in range(WINDOW_SIZE):
         if scenario == "demand_shift":
@@ -100,11 +123,36 @@ def _generate_ambiguous_series(base_p: float, base_q: float, temp: float,
             osc = amp * math.sin(freq * 2 * math.pi * i / WINDOW_SIZE + phase)
             p_raw = base_p + osc
             q_raw = base_q - osc * np.random.uniform(0.2, 0.5)
-        else:  
+        elif scenario == "valve_opening":
             opening_rate = np.random.uniform(0.03, 0.10)
             stabilize = min(i / (WINDOW_SIZE * 0.6), 1.0)
             p_raw = base_p * (1 - opening_rate * stabilize)
             q_raw = base_q * (1 + opening_rate * 0.6 * stabilize)
+        elif scenario == "construction_vibration":
+            vib_amp = np.random.uniform(0.5, 2.0)
+            irregular = np.random.normal(0, 0.5)
+            osc = vib_amp * math.sin(3.0 * i + irregular) * np.random.uniform(0.6, 1.4)
+            p_raw = base_p + osc
+            q_raw = base_q + osc * np.random.uniform(0.3, 0.6)
+        elif scenario == "scheduled_purge":
+            purge_mid = WINDOW_SIZE // 2
+            purge_half = 2
+            if abs(i - purge_mid) <= purge_half:
+                intensity = 1.0 - abs(i - purge_mid) / (purge_half + 0.1)
+                drop = np.random.uniform(0.08, 0.20) * intensity
+                p_raw = base_p * (1 - drop)
+                q_raw = base_q * (1 + drop * 0.7)
+            else:
+                p_raw = base_p
+                q_raw = base_q
+        else:  # meter_drift
+            drift_rate = np.random.uniform(0.005, 0.015) * np.random.choice([-1, 1])
+            if i < int(WINDOW_SIZE * 0.7):
+                p_raw = base_p * (1 + drift_rate * i)
+                q_raw = base_q
+            else:
+                p_raw = base_p
+                q_raw = base_q
 
         p = _apply_sensor_model(p_raw, sensor["p_bias"], sensor["noise_pct"], base_p, age)
         q = _apply_sensor_model(q_raw, sensor["q_bias"], sensor["noise_pct"], base_q, age)
@@ -114,12 +162,16 @@ def _generate_ambiguous_series(base_p: float, base_q: float, temp: float,
             "flow_rate_lps": max(0, q),
             "ambient_temp_c": temp + np.random.normal(0, 0.4),
         })
-    return readings
+    return _apply_sensor_artifacts(readings)
 
 
 def _generate_leak_series(base_p: float, base_q: float, temp: float,
                           sensor: dict, age: int, severity: str,
                           diameter_mm: float) -> list[dict]:
+
+    dynamic = random.choices(
+        ["exponential", "stepped", "slow_creep"], weights=[0.5, 0.3, 0.2]
+    )[0]
 
     lambda_configs = {
         "minor":    np.random.uniform(0.008, 0.025),
@@ -138,17 +190,45 @@ def _generate_leak_series(base_p: float, base_q: float, temp: float,
     orifice_frac = orifice_fractions[severity]
 
     onset = np.random.randint(0, WINDOW_SIZE // 3 + 1)
+
+    # Pre-compute stepped leak drop points
+    step_points, step_drops = [], []
+    if dynamic == "stepped":
+        n_steps = random.randint(2, 3)
+        candidates = list(range(onset, WINDOW_SIZE))
+        if len(candidates) >= n_steps:
+            step_points = sorted(random.sample(candidates, n_steps))
+        else:
+            step_points = candidates
+        step_drops = [np.random.uniform(0.03, 0.12) for _ in step_points]
+
     readings = []
+    cumulative_drop = 0.0
+    current_step = 0
 
     for i in range(WINDOW_SIZE):
         if i < onset:
             p_raw = base_p
             q_raw = base_q
-        else:
+        elif dynamic == "exponential":
             elapsed = i - onset
             p_raw = base_p * math.exp(-lam * elapsed)
             q_leak = base_q * orifice_frac * math.sqrt(max(p_raw / base_p, 0.01))
-            q_raw = base_q + q_leak * np.random.uniform(8, 15)  # amplification factor
+            q_raw = base_q + q_leak * np.random.uniform(8, 15)
+        elif dynamic == "stepped":
+            # Pressure drops in discrete steps (crack widening in bursts)
+            while current_step < len(step_points) and i >= step_points[current_step]:
+                cumulative_drop += step_drops[current_step]
+                current_step += 1
+            p_raw = base_p * (1 - cumulative_drop)
+            q_leak = base_q * orifice_frac * math.sqrt(max(1 - cumulative_drop, 0.01))
+            q_raw = base_q + q_leak * np.random.uniform(6, 12)
+        else:  # slow_creep
+            # Very gradual linear decline, hard to distinguish from normal drift
+            elapsed = i - onset
+            creep_rate = lam * 0.3
+            p_raw = base_p * (1 - creep_rate * elapsed)
+            q_raw = base_q * (1 + creep_rate * elapsed * 0.3)
 
         p = _apply_sensor_model(p_raw, sensor["p_bias"], sensor["noise_pct"], base_p, age)
         q = _apply_sensor_model(q_raw, sensor["q_bias"], sensor["noise_pct"], base_q, age)
@@ -158,7 +238,7 @@ def _generate_leak_series(base_p: float, base_q: float, temp: float,
             "flow_rate_lps": max(0, q),
             "ambient_temp_c": temp + np.random.normal(0, 0.3),
         })
-    return readings
+    return _apply_sensor_artifacts(readings)
 
 
 # feature engineering (label-blind)
