@@ -1,0 +1,86 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: aia
+      POSTGRES_PASSWORD: aia
+      POSTGRES_DB: aia
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aia -d aia"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  simulator:
+    build: ./simulator
+    environment:
+      AIA_SERVICE_URL: http://aia-service:8001
+      REDIS_URL: redis://redis:6379/0
+      TICK_SECONDS: "2.0"
+      BATCH_INTERVAL_TICKS: "2"
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  aia-service:
+    build: ./aia_service
+    environment:
+      SIMULATOR_URL: http://simulator:8000
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_DSN: postgresql://aia:aia@timescaledb:5432/aia
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-sonnet-4-6}"
+    ports:
+      - "8001:8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  dashboard:
+    build: ./dashboard
+    environment:
+      SIMULATOR_URL: http://simulator:8000
+      AIA_SERVICE_URL: http://aia-service:8001
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      simulator:
+        condition: service_healthy
+      aia-service:
+        condition: service_healthy
+
+volumes:
+  timescale_data:

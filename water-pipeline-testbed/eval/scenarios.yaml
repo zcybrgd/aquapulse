@@ -1,0 +1,90 @@
+# Evaluation scenarios for the AquaPulse testbed.
+#
+# Each scenario injects a fault (and optionally an environment temperature)
+# on a specific cluster, waits for the AIA to process a few batches, then
+# checks the latest recorded result against the expected outcome.
+#
+# expected_classification: one of
+#   confirmed_anomaly | likely_connectivity_artifact | confirmed_instrument_fault | insufficient_data
+# expected_tier_min / expected_tier_max: inclusive range (omit either bound to leave it open)
+
+- name: "A: thermal cellular outage (connectivity artifact)"
+  cluster_id: cluster-desert-045
+  env_temp: extreme
+  fault_type: thermal_cell_degradation
+  magnitude: default
+  wait_seconds: 10
+  expected_classification: likely_connectivity_artifact
+  expected_tier_min: 1
+  expected_tier_max: 1
+
+- name: "B: catastrophic leak near reservoir"
+  cluster_id: cluster-desert-042
+  env_temp: normal
+  fault_type: leak
+  magnitude: large
+  wait_seconds: 12
+  expected_classification: confirmed_anomaly
+  expected_tier_min: 2
+  expected_tier_max: 3
+
+- name: "C: hardware instrument fault"
+  cluster_id: cluster-desert-044
+  env_temp: normal
+  fault_type: sensor_failure
+  magnitude: default
+  wait_seconds: 10
+  expected_classification: confirmed_instrument_fault
+  expected_tier_min: 1
+  expected_tier_max: 1
+
+- name: "D: Nokia NaC platform outage (insufficient data + fallback tier)"
+  cluster_id: cluster-desert-043
+  env_temp: normal
+  fault_type: leak
+  magnitude: large
+  simulate_api_outage: true
+  wait_seconds: 10
+  expected_classification: insufficient_data
+  expected_tier_min: 2
+  expected_tier_max: 2
+
+- name: "E: pump degradation (gradual, moderate criticality)"
+  cluster_id: cluster-desert-043
+  env_temp: normal
+  fault_type: pump_degradation
+  magnitude: default
+  wait_seconds: 40
+  expected_classification: confirmed_anomaly
+  expected_tier_min: 1
+  expected_tier_max: 2
+
+- name: "F: valve stuck open (uncontrolled flow)"
+  cluster_id: cluster-desert-045
+  env_temp: normal
+  fault_type: valve_stuck_open
+  magnitude: default
+  wait_seconds: 12
+  expected_classification: confirmed_anomaly
+  expected_tier_min: 1
+  expected_tier_max: 2
+
+- name: "G: pressure spike (valve closure / surge)"
+  cluster_id: cluster-desert-046
+  env_temp: normal
+  fault_type: pressure_spike
+  magnitude: default
+  wait_seconds: 10
+  expected_classification: confirmed_anomaly
+  expected_tier_min: 1
+  expected_tier_max: 2
+
+- name: "H: sensor drift (miscalibration, no real physical event)"
+  cluster_id: cluster-desert-046
+  env_temp: normal
+  fault_type: sensor_drift
+  magnitude: default
+  wait_seconds: 30
+  expected_classification: confirmed_anomaly
+  expected_tier_min: 1
+  expected_tier_max: 2
