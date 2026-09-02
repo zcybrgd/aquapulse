@@ -23,5 +23,6 @@ class ActuationState(TypedDict, total=False):
     #outputs
     audit_entry: AuditLogEntry
     error: Optional[str]
+    operator_message: str
 
 
