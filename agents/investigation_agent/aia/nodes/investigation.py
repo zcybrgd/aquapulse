@@ -18,8 +18,8 @@ so a platform outage can never be misread as a legitimate reading.
 """
 from __future__ import annotations
 
-from aia.camara_client import CamaraClient, safe_get_congestion_insights, safe_get_device_reachability_status
-from aia.config import MAX_INSUFFICIENT_DATA_RETRIES, THERMAL_DEGRADATION_TEMP_C
+from aia.clients.camara_client import CamaraClient, safe_get_congestion_insights, safe_get_device_reachability_status
+from aia.config import THERMAL_DEGRADATION_TEMP_C
 from aia.models import Classification, ClusterInvestigationState, CongestionLevel, ReachabilityStatus
 
 
@@ -34,10 +34,11 @@ def investigate(
 
     reach = safe_get_device_reachability_status(camara_client, state.sensor_cluster_id)
     state.camara_reachability_status = reach.status
-    state.api_unavailable = reach.api_unavailable
     state.api_error_detail = reach.error_detail
 
     if reach.api_unavailable:
+        state.api_unavailable = True
+        state.reachability_api_unavailable = True
         _apply_insufficient_data(state)
         return state
 
@@ -53,11 +54,10 @@ def investigate(
             # not degrade to insufficient_data; we just note the missing
             # congestion reading for the confidence score.
             state.camara_congestion_level = CongestionLevel.UNAVAILABLE
-            state.api_unavailable = True  # affects C_CAMARA in the confidence score only
+            state.congestion_api_unavailable = True
         else:
             state.camara_congestion_level = congestion.level
         state.classification = Classification.CONFIRMED_ANOMALY
-        state.consecutive_insufficient_data_cycles = 0
         return state
 
     # UNREACHABLE -> query Congestion Insights to disambiguate thermal cell
@@ -66,6 +66,7 @@ def investigate(
     state.camara_congestion_level = congestion.level
     if congestion.api_unavailable:
         state.api_unavailable = True
+        state.congestion_api_unavailable = True
         _apply_insufficient_data(state)
         return state
 
@@ -75,24 +76,19 @@ def investigate(
         state.classification = Classification.CONFIRMED_INSTRUMENT_FAULT
         state.is_stale_pre_outage_data = True
 
-    state.consecutive_insufficient_data_cycles = 0
     return state
 
 
 def _apply_insufficient_data(state: ClusterInvestigationState) -> None:
     """
-    Section 5.B.3-4: on API failure, never infer a classification. Requeue
-    with elevated priority; after 3 consecutive cycles, escalate to a human
-    operator.
+    Section 5.B.3-4: on API failure, never infer a classification.
+
+    Only sets the classification here. Requeue/escalation decisions and
+    cross-batch cycle counting are handled by the RetryTracker in
+    pipeline.py (single source of truth) to avoid the double-counting
+    bug that arises when two modules independently maintain the counter.
     """
     state.classification = Classification.INSUFFICIENT_DATA
-    state.consecutive_insufficient_data_cycles += 1
-    if state.consecutive_insufficient_data_cycles >= MAX_INSUFFICIENT_DATA_RETRIES:
-        state.escalate_to_human = True
-        state.requeue = False
-    else:
-        state.requeue = True
-        state.escalate_to_human = False
 
 
 def check_platform_wide_outage(states: list[ClusterInvestigationState]) -> bool:

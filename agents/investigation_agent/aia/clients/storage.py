@@ -40,6 +40,10 @@ class TimescaleDBStore:
             ambient_temp_c  DOUBLE PRECISION
         );
         SELECT create_hypertable('telemetry_archive', 'time');
+
+    Uses a single persistent connection (lazily initialized) to avoid
+    exhausting the connection pool when archiving hundreds of healthy
+    windows per batch. Call `close()` at shutdown for clean teardown.
     """
 
     def __init__(self, dsn: str):
@@ -47,9 +51,16 @@ class TimescaleDBStore:
 
         self._psycopg2 = psycopg2
         self._dsn = dsn
+        self._conn = None
+
+    def _get_connection(self):
+        """Return the persistent connection, reconnecting if needed."""
+        if self._conn is None or self._conn.closed:
+            self._conn = self._psycopg2.connect(self._dsn)
+        return self._conn
 
     def archive_normal_window(self, window: TelemetryWindow) -> None:
-        conn = self._psycopg2.connect(self._dsn)
+        conn = self._get_connection()
         try:
             with conn.cursor() as cur:
                 cur.executemany(
@@ -70,5 +81,12 @@ class TimescaleDBStore:
                     ],
                 )
             conn.commit()
-        finally:
-            conn.close()
+        except Exception:
+            conn.rollback()
+            raise
+
+    def close(self) -> None:
+        """Release the database connection for clean shutdown."""
+        if self._conn is not None and not self._conn.closed:
+            self._conn.close()
+            self._conn = None

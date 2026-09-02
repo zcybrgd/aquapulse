@@ -1,26 +1,17 @@
-"""
-Example run of the Anomaly Investigation Agent, reproducing the three
-clusters described in the spec (Section 3 input example + Section 7 output
-example):
-
-  - cluster-desert-042: catastrophic leak near a NEOM reservoir -> Tier 3
-  - cluster-desert-043: healthy telemetry -> archived, never investigated
-  - cluster-desert-044: sensor gone dark, low congestion -> instrument fault
-
-Run with:  python -m aia.main
-"""
 from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 
-from aia.camara_client import MockCamaraClient
-from aia.detection import BaselineStats, BaselineStore
+from aia.clients.camara_client import MockCamaraClient
+from aia.clients.storage import InMemoryTelemetryStore
+from aia.clients.topology import build_default_demo_topology
+from aia.config import LLM_BASE_URL, LLM_MODEL
 from aia.models import CongestionLevel, NetworkMetadata, ReachabilityStatus, Reading, StreamingBatch, TelemetryWindow
+from aia.nodes.detection import BaselineStats, BaselineStore
 from aia.pipeline import AnomalyInvestigationAgent
-from aia.storage import InMemoryTelemetryStore
-from aia.topology import build_default_demo_topology
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
@@ -94,14 +85,37 @@ def build_demo_camara_client() -> MockCamaraClient:
     })
 
 
+def build_llm_client():
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        logging.getLogger("aia").warning("OPENROUTER_API_KEY not found; falling back to deterministic narrator.")
+        return None
+        
+    return api_key
+
+
 def main() -> None:
+    llm_client = build_llm_client()
+
+    # Load the pre-trained Random Forest leak detector
+    try:
+        from ml_model.inference import LeakDetector
+        leak_detector = LeakDetector()
+    except FileNotFoundError:
+        logging.getLogger("aia").warning(
+            "No trained model found. Run `python -m ml_model.train` first. "
+            "Falling back to Z-score/sharp-deviation detection only."
+        )
+        leak_detector = None
+
     agent = AnomalyInvestigationAgent(
         baseline_store=build_seeded_baselines(),
         topology=build_default_demo_topology(),
         telemetry_store=InMemoryTelemetryStore(),
         camara_client=build_demo_camara_client(),
-        anthropic_client=None,  # falls back to the deterministic narrator; pass an
-                                 # anthropic.Anthropic() instance to use live narration
+        leak_detector=leak_detector,
+        llm_client=llm_client,
+        llm_model=LLM_MODEL,
     )
 
     batch = build_demo_batch()

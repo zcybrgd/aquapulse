@@ -12,9 +12,9 @@ telemetry batch. This module provides a small abstraction:
     REDIS_URL is configured. It is optional -- the `redis` package is only
     imported lazily so the rest of the AIA runs without it installed.
 
-Each segment record contains exactly the fields Stage 3 needs:
+Each segment record contains the fields Stage 3 needs:
   segment_id, criticality_score (1-3), proximity_to_reservoir_m,
-  population_served, associated_valve_id.
+  population_served, associated_valve_id, pipe_diameter_mm, zone_id.
 """
 from __future__ import annotations
 
@@ -30,6 +30,8 @@ class SegmentTopology(BaseModel):
     proximity_to_reservoir_m: float
     population_served: int
     associated_valve_id: str
+    pipe_diameter_mm: float = 200.0   # default 200mm if unknown
+    zone_id: str | None = None         # geographic zone for zone-specific thresholds
 
 
 class ClusterTopologyMapping(BaseModel):
@@ -107,6 +109,8 @@ def build_default_demo_topology() -> InMemoryTopologyCache:
                 proximity_to_reservoir_m=120.0,
                 population_served=45000,
                 associated_valve_id="valve-neom-north-01",
+                pipe_diameter_mm=400.0,
+                zone_id="neom-north",
             ),
         ),
         ClusterTopologyMapping(
@@ -117,6 +121,8 @@ def build_default_demo_topology() -> InMemoryTopologyCache:
                 proximity_to_reservoir_m=2400.0,
                 population_served=8000,
                 associated_valve_id="valve-neom-north-02",
+                pipe_diameter_mm=250.0,
+                zone_id="neom-north",
             ),
         ),
         ClusterTopologyMapping(
@@ -127,6 +133,8 @@ def build_default_demo_topology() -> InMemoryTopologyCache:
                 proximity_to_reservoir_m=8500.0,
                 population_served=12,
                 associated_valve_id="valve-neom-north-03",
+                pipe_diameter_mm=100.0,
+                zone_id="neom-north",
             ),
         ),
     ])

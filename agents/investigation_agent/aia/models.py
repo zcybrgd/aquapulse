@@ -36,10 +36,6 @@ def sanitize_identifier(value: str) -> str:
     return value
 
 
-# ---------------------------------------------------------------------------
-# Input models (Section 3)
-# ---------------------------------------------------------------------------
-
 class Reading(BaseModel):
     timestamp: datetime
     pressure_psi: float
@@ -111,11 +107,13 @@ class PhysicalDeviations(BaseModel):
     is_stale_pre_outage_data: bool = False
 
 
+# criticality selon : la proximite au reservoir et aussi le nombre de gens servis
 class CriticalityMetrics(BaseModel):
     criticality_score: int = Field(ge=1, le=3)
     proximity_to_reservoir_m: float
     population_served: int
     associated_valve_id: str
+    pipe_diameter_mm: float = 200.0
 
     @field_validator("associated_valve_id")
     @classmethod
@@ -167,13 +165,15 @@ class ClusterInvestigationState(BaseModel):
     # Stage 1 outputs
     z_score_pressure: float = 0.0
     z_score_flow: float = 0.0
-    iso_forest_score: Optional[float] = None
+    ml_confidence: Optional[float] = None
     detection_reason: str = ""
 
     # Stage 2 outputs
     camara_reachability_status: Optional[ReachabilityStatus] = None
     camara_congestion_level: Optional[CongestionLevel] = None
     api_unavailable: bool = False
+    reachability_api_unavailable: bool = False
+    congestion_api_unavailable: bool = False
     api_error_detail: Optional[str] = None
     consecutive_insufficient_data_cycles: int = 0
     classification: Optional[Classification] = None
@@ -184,6 +184,8 @@ class ClusterInvestigationState(BaseModel):
     proximity_to_reservoir_m: Optional[float] = None
     population_served: Optional[int] = None
     associated_valve_id: Optional[str] = None
+    pipe_diameter_mm: Optional[float] = None
+    zone_id: Optional[str] = None
     pressure_drop_pct: float = 0.0
     flow_surge_pct: float = 0.0
     pressure_slope: float = 0.0
@@ -192,6 +194,7 @@ class ClusterInvestigationState(BaseModel):
     is_stale_pre_outage_data: bool = False
     severity_tier: Optional[int] = None
     confidence_score: Optional[float] = None
+    estimated_volume_loss_lpm: Optional[float] = None
 
     # Stage 4 outputs
     operator_justification: Optional[str] = None

@@ -1,19 +1,9 @@
-"""
-Configuration constants for the Anomaly Investigation Agent (AIA).
-
-All safety-critical thresholds live here in one place so they can be
-audited, tuned, and unit-tested without hunting through business logic.
-Values are taken directly from the AIA Technical Specification v4.0.
-"""
 from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # Stage 1: Anomaly Detection
 # ---------------------------------------------------------------------------
 
-# Deterministic safety-floor Z-score threshold (Section 5.A.1).
-# NOTE: per the "Safety Separation Rule", this threshold is NEVER adjusted
-# for temperature. Only the ML layer's noise tolerance is temperature-adaptive.
 Z_SCORE_THRESHOLD = 3.0
 
 # Rolling window (minutes) used for the deterministic rate-of-change check.
@@ -23,16 +13,8 @@ ROLLING_WINDOW_MINUTES = 5
 INSTANT_PRESSURE_DROP_PCT_FLOOR = 15.0   # >= this % drop within the rolling window -> suspicious
 INSTANT_FLOW_SURGE_PCT_FLOOR = 20.0      # >= this % surge within the rolling window -> suspicious
 
-# Isolation Forest bootstrap parameters (Section 5.A.2)
-ISO_FOREST_CONTAMINATION = 0.05
-ISO_FOREST_N_ESTIMATORS = 100
-ISO_FOREST_RANDOM_STATE = 42
-ISO_FOREST_MIN_BOOTSTRAP_SAMPLES = 50   # minimum samples before the ML layer is trusted
 
-# Temperature-adaptive ML noise tolerance (Section 5.A.2).
-# Above this temperature, the ML layer's anomaly score threshold tau is
-# relaxed (made less sensitive to routine thermal noise) -- but ONLY the ML
-# layer. The Z-score floors above are never touched.
+ISO_FOREST_MIN_BOOTSTRAP_SAMPLES = 50   # minimum samples before the ML layer is trusted
 ML_TEMP_ADAPTATION_THRESHOLD_C = 50.0
 ML_TEMP_ADAPTATION_TAU_SHIFT = 0.05      # widen the ML decision boundary by this much
 
@@ -66,21 +48,68 @@ API_UNAVAILABLE_FALLBACK_TIER = 2
 # ---------------------------------------------------------------------------
 # Stage 3: Deterministic Risk Assessment & Severity Tiering
 # ---------------------------------------------------------------------------
-# Reconciled Risk Tiering Matrix (Section 5.C.3):
-#   Tier 1 (Minor):        delta_p_pct < 15%             AND criticality <= 1
-#   Tier 2 (Moderate):     15% <= delta_p_pct < 35%       OR  criticality == 2
-#   Tier 3 (Catastrophic): delta_p_pct >= 35%
-#                          AND pressure_slope < -2.0 psi/min
-#                          AND criticality == 3
+# Default risk thresholds (global). Zone-specific profiles override these
+# values when a segment's zone_id is found in ZONE_PROFILES below.
+DEFAULT_TIER1_DELTA_P_PCT_MAX = 15.0
+DEFAULT_TIER2_DELTA_P_PCT_MIN = 15.0
+DEFAULT_TIER2_DELTA_P_PCT_MAX = 35.0
+DEFAULT_TIER3_DELTA_P_PCT_MIN = 35.0
+DEFAULT_TIER3_PRESSURE_SLOPE_MAX = -1.5  # psi/min; slope must be MORE negative than this
+                                          # Calibrated for regression-based slope (Section 5.C.2).
 
-TIER1_DELTA_P_PCT_MAX = 15.0
-TIER2_DELTA_P_PCT_MIN = 15.0
-TIER2_DELTA_P_PCT_MAX = 35.0
-TIER3_DELTA_P_PCT_MIN = 35.0
-TIER3_PRESSURE_SLOPE_MAX = -2.0  # psi/min; slope must be MORE negative than this
+# Backward-compatible aliases for code that uses the old names directly.
+TIER1_DELTA_P_PCT_MAX = DEFAULT_TIER1_DELTA_P_PCT_MAX
+TIER2_DELTA_P_PCT_MIN = DEFAULT_TIER2_DELTA_P_PCT_MIN
+TIER2_DELTA_P_PCT_MAX = DEFAULT_TIER2_DELTA_P_PCT_MAX
+TIER3_DELTA_P_PCT_MIN = DEFAULT_TIER3_DELTA_P_PCT_MIN
+TIER3_PRESSURE_SLOPE_MAX = DEFAULT_TIER3_PRESSURE_SLOPE_MAX
+
 TIER3_CRITICALITY_REQUIRED = 3
 TIER2_CRITICALITY_TRIGGER = 2
 TIER1_CRITICALITY_MAX = 1
+
+# Emergency override: an extreme pressure drop unconditionally triggers Tier 3
+# regardless of criticality, preventing a topology-cache miss or unconfigured
+# segment from silently downgrading a catastrophic rupture.
+TIER3_EMERGENCY_DELTA_P_PCT_MIN = 60.0
+
+# ---------------------------------------------------------------------------
+# Zone-specific threshold profiles (Section 5.C.3 extension)
+# ---------------------------------------------------------------------------
+# Each zone can override the default tier thresholds. This allows operators
+# to tune sensitivity per geographic area (e.g. newer infrastructure in
+# NEOM-North vs older pipes in NEOM-South). Segments without a zone_id or
+# with an unrecognized zone fall back to the DEFAULT_* constants above.
+ZONE_PROFILES: dict[str, dict[str, float]] = {
+    "neom-north": {
+        "tier1_delta_p_pct_max": 15.0,
+        "tier2_delta_p_pct_min": 15.0,
+        "tier2_delta_p_pct_max": 35.0,
+        "tier3_delta_p_pct_min": 35.0,
+        "tier3_pressure_slope_max": -1.5,
+    },
+    "neom-south": {
+        "tier1_delta_p_pct_max": 12.0,
+        "tier2_delta_p_pct_min": 12.0,
+        "tier2_delta_p_pct_max": 30.0,
+        "tier3_delta_p_pct_min": 30.0,
+        "tier3_pressure_slope_max": -1.2,  # older pipes, more sensitive
+    },
+}
+
+
+def get_zone_thresholds(zone_id: str | None) -> dict[str, float]:
+    """Return the threshold profile for a given zone, falling back to defaults."""
+    if zone_id and zone_id in ZONE_PROFILES:
+        return ZONE_PROFILES[zone_id]
+    return {
+        "tier1_delta_p_pct_max": DEFAULT_TIER1_DELTA_P_PCT_MAX,
+        "tier2_delta_p_pct_min": DEFAULT_TIER2_DELTA_P_PCT_MIN,
+        "tier2_delta_p_pct_max": DEFAULT_TIER2_DELTA_P_PCT_MAX,
+        "tier3_delta_p_pct_min": DEFAULT_TIER3_DELTA_P_PCT_MIN,
+        "tier3_pressure_slope_max": DEFAULT_TIER3_PRESSURE_SLOPE_MAX,
+    }
+
 
 # Confidence score weights (Section 5.D). Must sum to 1.0.
 CONFIDENCE_WEIGHT_TELEMETRY = 0.40
@@ -89,10 +118,13 @@ CONFIDENCE_WEIGHT_TREND = 0.20
 EXPECTED_TELEMETRY_WINDOW_LEN = 10  # "complete" window size for C_telemetry = 1.0
 
 # ---------------------------------------------------------------------------
-# Stage 4: AI Narration
+# Stage 4: AI Narration (OpenRouter-compatible)
 # ---------------------------------------------------------------------------
-ANTHROPIC_MODEL = "claude-sonnet-4-6"
-NARRATION_MAX_TOKENS = 400
+# OpenRouter exposes LLMs through an OpenAI-compatible API. Any model
+# available on https://openrouter.ai/models can be used here.
+LLM_MODEL = "google/gemma-4-26b-a4b-it:free"
+LLM_BASE_URL = "https://openrouter.ai/api/v1"
+LLM_MAX_TOKENS = 400
 
 # Prompt-injection guardrail (Section 6): only alnum + hyphen accepted for any
 # field-sourced identifier that flows into the LLM prompt template.

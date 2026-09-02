@@ -1,24 +1,3 @@
-"""
-Nokia Network-as-Code (NaC) CAMARA API client wrappers (Section 5.B, Section 9 Phase 1).
-
-Exposes two calls used by Stage 2 (Anomaly Investigation):
-  - Device Reachability Status API
-  - Congestion Insights API
-
-Every call is wrapped so that a platform-side failure (auth failure, socket
-error, timeout, non-2xx response) is surfaced as `api_unavailable=True`
-rather than being misread as a legitimate UNREACHABLE/HIGH-congestion
-reading (Section 5.B.3). The AIA must NEVER infer a classification from a
-failed API call.
-
-Two implementations are provided:
-  - `MockCamaraClient`: deterministic, scenario-driven client used for
-    local development, unit tests, and demos (no network access required).
-  - `HttpCamaraClient`: thin `httpx`-based client for the live/sandbox
-    Nokia NaC endpoints, following the "raw diagnostic requests first"
-    guidance in Section 9 Phase 1. OAuth2 bearer token is injected via the
-    `token_provider` callable so token refresh logic stays outside this class.
-"""
 from __future__ import annotations
 
 import random
@@ -55,27 +34,21 @@ class CamaraClient(Protocol):
 def safe_get_device_reachability_status(
     client: CamaraClient, sensor_cluster_id: str
 ) -> ReachabilityResult:
-    """try/except wrapper (Section 5.B.3) around Device Reachability Status."""
+    """try/except wrapper around Device Reachability Status."""
     try:
         return client.get_device_reachability_status(sensor_cluster_id)
-    except Exception as exc:  # noqa: BLE001 - platform failures must never propagate
+    except Exception as exc: 
         return ReachabilityResult(status=None, api_unavailable=True, error_detail=str(exc))
 
 
 def safe_get_congestion_insights(
     client: CamaraClient, sensor_cluster_id: str
 ) -> CongestionResult:
-    """try/except wrapper (Section 5.B.3) around Congestion Insights."""
+    """try/except wrapper around Congestion Insights."""
     try:
         return client.get_congestion_insights(sensor_cluster_id)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc: 
         return CongestionResult(level=None, api_unavailable=True, error_detail=str(exc))
-
-
-# ---------------------------------------------------------------------------
-# Mock client -- deterministic scenario overrides + random fallback.
-# Used for tests, demos, and Scenario A-E validation (Section 9 Phase 3).
-# ---------------------------------------------------------------------------
 
 @dataclass
 class MockCamaraClient:
@@ -120,9 +93,6 @@ class MockCamaraClient:
         return CongestionResult(level=level, api_unavailable=False)
 
 
-# ---------------------------------------------------------------------------
-# HTTP client for the live Nokia NaC CAMARA sandbox / production endpoints.
-# ---------------------------------------------------------------------------
 
 class HttpCamaraClient:
     """

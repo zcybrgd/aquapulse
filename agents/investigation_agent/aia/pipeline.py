@@ -1,27 +1,17 @@
-"""
-Top-level batch pipeline (Section 2: the full 4-stage AIA flow).
 
-`AnomalyInvestigationAgent.process_batch()` is the single entry point:
-
-    1. For every telemetry_window in the batch, run Stage 1 detection.
-       Healthy windows are archived to the TelemetryStore and skipped.
-    2. Suspicious windows are run through the compiled LangGraph
-       (Stage 2 investigation -> Stage 3 risk -> Stage 4 narration).
-    3. Cross-batch retry state (Section 5.B.4 / Scenario E) is tracked here,
-       since it spans multiple `process_batch()` calls.
-    4. A validated `AIABatchOutputPayload` is returned, containing only
-       investigated (suspicious/anomalous/faulted) clusters -- normal
-       telemetry never appears in the output (Section 7).
-"""
 from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-from aia.camara_client import CamaraClient
-from aia.detection import BaselineStore, detect_and_learn
-from aia.investigation import check_platform_wide_outage
+from aia.clients.camara_client import CamaraClient
+from aia.clients.storage import TelemetryStore
+from aia.clients.topology import TopologyCache
+from aia.config import MAX_INSUFFICIENT_DATA_RETRIES
+from aia.nodes.detection import BaselineStore, detect_and_learn
+from aia.nodes.investigation import check_platform_wide_outage
 from aia.models import (
     AIABatchOutputPayload,
     Classification,
@@ -33,19 +23,13 @@ from aia.models import (
     StreamingBatch,
     TelemetryWindow,
 )
-from aia.storage import TelemetryStore
-from aia.topology import TopologyCache
 
 logger = logging.getLogger("aia")
 
 
 @dataclass
 class RetryTracker:
-    """
-    Cross-batch bookkeeping for clusters stuck in `insufficient_data`
-    (Section 5.B.4) so consecutive-cycle counts survive between
-    `process_batch()` calls.
-    """
+
     consecutive_cycles: dict[str, int] = field(default_factory=dict)
 
     def get(self, cluster_id: str) -> int:
@@ -66,22 +50,26 @@ class AnomalyInvestigationAgent:
         topology: TopologyCache,
         telemetry_store: TelemetryStore,
         camara_client: CamaraClient,
-        anthropic_client=None,
-        anthropic_model: str = "claude-sonnet-4-6",
+        leak_detector=None,
+        llm_client=None,
+        llm_model: str = "anthropic/claude-3.5-sonnet",
         retry_tracker: RetryTracker | None = None,
+        max_workers: int = 4,
     ):
-        from aia.graph import build_investigation_graph
+        from aia.graph.builder import build_investigation_graph
 
         self.baseline_store = baseline_store
         self.topology = topology
         self.telemetry_store = telemetry_store
         self.camara_client = camara_client
+        self.leak_detector = leak_detector
         self.retry_tracker = retry_tracker or RetryTracker()
+        self._max_workers = max_workers
         self._graph = build_investigation_graph(
             camara_client=camara_client,
             topology=topology,
-            anthropic_client=anthropic_client,
-            model=anthropic_model,
+            llm_client=llm_client,
+            model=llm_model,
         )
 
     # -- Stage 1 --------------------------------------------------------
@@ -89,7 +77,19 @@ class AnomalyInvestigationAgent:
     def _run_detection(self, batch: StreamingBatch) -> tuple[list[TelemetryWindow], int]:
         suspicious: list[TelemetryWindow] = []
         for window in batch.telemetry_windows:
-            result = detect_and_learn(window, self.baseline_store)
+            # Look up pipe metadata from topology for the ML model
+            segment = self.topology.get_segment_for_cluster(window.sensor_cluster_id)
+            pipe_diameter = segment.pipe_diameter_mm if segment else 200.0
+            pipe_material = "HDPE"  # default; could be extended in SegmentTopology
+            pipe_age = 10           # default; could be extended in SegmentTopology
+
+            result = detect_and_learn(
+                window, self.baseline_store,
+                leak_detector=self.leak_detector,
+                pipe_diameter_mm=pipe_diameter,
+                pipe_age_years=pipe_age,
+                pipe_material=pipe_material,
+            )
             if result.is_suspicious:
                 logger.info("Cluster %s flagged suspicious: %s", window.sensor_cluster_id, result.reason)
                 suspicious.append(window)
@@ -115,14 +115,39 @@ class AnomalyInvestigationAgent:
         if final_state.classification == Classification.INSUFFICIENT_DATA:
             cycles = self.retry_tracker.record_insufficient_data(window.sensor_cluster_id)
             final_state.consecutive_insufficient_data_cycles = cycles
-            final_state.escalate_to_human = cycles >= 3
+            final_state.escalate_to_human = cycles >= MAX_INSUFFICIENT_DATA_RETRIES
             final_state.requeue = not final_state.escalate_to_human
         else:
             self.retry_tracker.reset(window.sensor_cluster_id)
 
         return final_state
 
-    # -- Output compilation (Section 7) ----------------------------------
+    def _investigate_clusters_parallel(
+        self, windows: list[TelemetryWindow]
+    ) -> list[ClusterInvestigationState]:
+        """
+        Process multiple suspicious clusters in parallel using a thread pool.
+        Each cluster gets its own LangGraph invocation (Stages 2-4).
+        """
+        if len(windows) <= 1:
+            return [self._investigate_cluster(w) for w in windows]
+
+        results: list[ClusterInvestigationState] = []
+        with ThreadPoolExecutor(max_workers=min(self._max_workers, len(windows))) as executor:
+            future_to_window = {
+                executor.submit(self._investigate_cluster, w): w
+                for w in windows
+            }
+            for future in as_completed(future_to_window):
+                try:
+                    results.append(future.result())
+                except Exception:
+                    window = future_to_window[future]
+                    logger.exception(
+                        "Investigation failed for cluster %s", window.sensor_cluster_id
+                    )
+        return results
+
 
     @staticmethod
     def _to_investigated_threat(state: ClusterInvestigationState) -> InvestigatedThreat:
@@ -153,6 +178,7 @@ class AnomalyInvestigationAgent:
                 proximity_to_reservoir_m=state.proximity_to_reservoir_m or 0.0,
                 population_served=state.population_served or 0,
                 associated_valve_id=state.associated_valve_id or f"unknown-{state.sensor_cluster_id}",
+                pipe_diameter_mm=state.pipe_diameter_mm or 200.0,
             ),
             operator_justification=state.operator_justification or "",
             confidence_score=state.confidence_score or 0.0,
@@ -165,7 +191,8 @@ class AnomalyInvestigationAgent:
 
         suspicious_windows, total_clusters = self._run_detection(batch)
 
-        investigated_states = [self._investigate_cluster(w) for w in suspicious_windows]
+        # Process suspicious clusters in parallel (multi-instance)
+        investigated_states = self._investigate_clusters_parallel(suspicious_windows)
 
         if check_platform_wide_outage(investigated_states):
             logger.critical(
