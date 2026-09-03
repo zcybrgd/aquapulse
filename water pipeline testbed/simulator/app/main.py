@@ -11,6 +11,9 @@ Responsibilities:
     `SimulatedCamaraClient` to stand in for the real Nokia NaC CAMARA APIs.
   - Publishes live cluster state + fault events to Redis pub/sub
     (`sim:state`) so the dashboard can render everything in real time.
+  - Publishes raw, uninterpreted per-device sensor/actuator logs to
+    `sim:raw_logs` -- the testbed's job stops at generating and sending
+    evidence; it never classifies or flags anomalies itself (see raw_logs.py).
 """
 from __future__ import annotations
 
@@ -28,6 +31,7 @@ import config
 from faults import build_fault, list_available_faults
 from network_sim import derive_network_state
 from physics import SimulationState, tick
+from raw_logs import build_raw_logs
 from telemetry import build_batch
 from topology import SEGMENTS
 
@@ -67,6 +71,7 @@ async def _run_loop() -> None:
                 tick(state)
                 tick_index += 1
                 await _publish_state()
+                await _publish_raw_logs()
                 if tick_index % config.BATCH_INTERVAL_TICKS == 0:
                     await _dispatch_batch()
             await asyncio.sleep(state.tick_seconds)
@@ -100,6 +105,22 @@ async def _publish_state() -> None:
         await _redis.publish("sim:state", json.dumps(payload))
     except Exception:
         logger.exception("Failed to publish sim state to redis")
+
+
+async def _publish_raw_logs() -> None:
+    """
+    Publishes this tick's raw per-device sensor/actuator logs -- the literal
+    evidence stream the AIA consumes, shown as-is in the dashboard's "Raw
+    Sensor Logs" panel. No interpretation, no anomaly flag, no severity:
+    that's the Anomaly Investigation Agent's job, not the testbed's.
+    """
+    if _redis is None:
+        return
+    try:
+        logs = build_raw_logs(state)
+        await _redis.publish("sim:raw_logs", json.dumps({"type": "raw_logs", "tick": state.tick_count, "logs": logs}))
+    except Exception:
+        logger.exception("Failed to publish raw logs to redis")
 
 
 async def _dispatch_batch() -> None:

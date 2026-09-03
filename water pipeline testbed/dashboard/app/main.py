@@ -53,8 +53,8 @@ async def _pubsub_loop() -> None:
         try:
             redis_client = aioredis.from_url(config.REDIS_URL, decode_responses=True)
             pubsub = redis_client.pubsub()
-            await pubsub.subscribe("sim:state", "aia:results")
-            logger.info("Subscribed to sim:state and aia:results")
+            await pubsub.subscribe("sim:state", "sim:raw_logs", "aia:results")
+            logger.info("Subscribed to sim:state, sim:raw_logs, and aia:results")
             async for message in pubsub.listen():
                 if message["type"] != "message":
                     continue

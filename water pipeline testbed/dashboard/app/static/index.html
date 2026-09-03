@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AquaPulse — Digital Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">AP</span>
+      <div class="brand-text">
+        <span class="brand-title">AquaPulse</span>
+        <span class="brand-subtitle">Water Distribution Digital Twin</span>
+      </div>
+    </div>
+
+    <div class="topbar-metrics">
+      <div class="metric">
+        <span class="metric-label">Tick</span>
+        <span class="metric-value" id="tick-label">0</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Ambient</span>
+        <span class="metric-value" id="temp-label">38.0°C</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Link</span>
+        <span class="metric-value" id="conn-label"><i id="conn-dot" class="status-dot status-dot--off"></i>connecting</span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="btn btn--icon" id="btn-start" title="Start simulation" aria-label="Start">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="btn btn--icon" id="btn-stop" title="Pause simulation" aria-label="Pause">
+        <svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </button>
+      <button class="btn btn--icon" id="btn-reset" title="Reset simulation" aria-label="Reset">
+        <svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V9a5 5 0 1 1-5 5H5a7 7 0 1 0 7-9z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ============================== PHYSICAL SIMULATION DOMAIN ============================== -->
+    <section class="domain domain--physical">
+      <div class="domain-header">
+        <div class="domain-heading">
+          <span class="domain-eyebrow">Physical Simulation</span>
+          <h1 class="domain-title">Pipeline Digital Twin</h1>
+        </div>
+        <span class="domain-badge domain-badge--physical">Simulated Environment</span>
+      </div>
+
+      <div class="card card--viewport">
+        <div id="scene-container" class="scene-container">
+          <div class="scene-hint">Drag to orbit · Scroll to zoom</div>
+        </div>
+      </div>
+
+      <div class="card-row">
+        <div class="card card--readouts">
+          <div class="card-header">
+            <h2>Live Sensor Readouts</h2>
+          </div>
+          <table class="data-table" id="readout-table">
+            <thead>
+              <tr><th>Cluster</th><th>Pressure</th><th>Flow</th><th>Temp</th><th>State</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="card card--control">
+          <div class="card-header">
+            <h2>Scenario Control Panel</h2>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label">Environment Temperature</label>
+            <div class="segmented" id="temp-segmented">
+              <button data-temp="normal" class="segmented-btn is-active">Normal</button>
+              <button data-temp="high" class="segmented-btn">High</button>
+              <button data-temp="extreme" class="segmented-btn">Extreme</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sel-cluster">Target cluster</label>
+            <select id="sel-cluster" class="select"></select>
+          </div>
+
+          <div class="control-row-inline">
+            <div class="control-group control-group--grow">
+              <label class="control-label" for="sel-fault-type">Fault type</label>
+              <select id="sel-fault-type" class="select"></select>
+            </div>
+            <div class="control-group">
+              <label class="control-label" for="sel-magnitude">Magnitude</label>
+              <select id="sel-magnitude" class="select"></select>
+            </div>
+          </div>
+
+          <button class="btn btn--primary btn--block" id="btn-inject">Inject Fault</button>
+
+          <div class="control-group control-group--split">
+            <button class="btn btn--ghost" id="btn-clear-all">Clear All Faults</button>
+            <button class="btn btn--ghost" id="btn-outage-toggle">Simulate NaC Outage</button>
+          </div>
+
+          <p class="control-feedback" id="inject-feedback">Idle — no fault staged.</p>
+        </div>
+      </div>
+
+      <div class="card card--logs">
+        <div class="card-header">
+          <h2>Raw Sensor Log Stream</h2>
+          <span class="card-subhead">Uninterpreted device evidence → forwarded to the Anomaly Investigation Agent</span>
+        </div>
+        <div class="log-console" id="raw-log-console"></div>
+      </div>
+    </section>
+
+    <!-- ============================== CYBERSECURITY INTELLIGENCE DOMAIN ============================== -->
+    <section class="domain domain--cyber">
+      <div class="domain-header">
+        <div class="domain-heading">
+          <span class="domain-eyebrow domain-eyebrow--cyber">Cybersecurity Intelligence Layer</span>
+          <h1 class="domain-title">Anomaly Investigation Agent</h1>
+        </div>
+        <span class="domain-badge domain-badge--cyber">Independent Analysis</span>
+      </div>
+
+      <div class="card card--feed">
+        <div class="card-header">
+          <h2>Investigation Feed</h2>
+          <span class="card-subhead">Populated only when the agent produces a result — nothing here is pre-determined by the testbed</span>
+        </div>
+        <div id="feed-list" class="feed-list">
+          <div class="feed-empty" id="feed-empty">
+            No investigations yet. Inject a fault on the left and the agent will evaluate incoming telemetry independently.
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="/static/three-scene.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

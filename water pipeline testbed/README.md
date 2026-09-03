@@ -5,16 +5,17 @@ wired directly to the already-built **Anomaly Investigation Agent (AIA)**,
 with a live web dashboard and an automated scenario-evaluation framework.
 
 ```
-┌─────────────┐  telemetry batches  ┌──────────────┐   results     ┌───────────┐
-│  simulator  │ ───────────────────▶│  aia-service │──────────────▶│dashboard  │
-│ (physics +  │ ◀───────────────────│ (wraps the   │   (Redis      │(live SVG +│
-│  faults +   │  network_status     │  aia package │    pub/sub)   │ control   │
-│  network    │  (CAMARA stand-in)  │  unmodified) │               │ panel)    │
-│  sim)       │                     └──────┬───────┘               └───────────┘
-└──────┬──────┘                            │
-       │ sim:state (Redis)                 │ writes results
-       ▼                                   ▼
-   dashboard ◀───────────────────── TimescaleDB (eval framework reads from here)
+┌─────────────┐  telemetry batches   ┌──────────────┐   results    ┌───────────┐
+│  simulator   │ ───────────────────▶│  aia-service │──────────────▶│dashboard  │
+│ (physics +   │◀───────────────────│ (wraps the   │   (Redis      │(3D twin + │
+│  faults +    │  network_status     │  aia package │    pub/sub)   │ control   │
+│  network     │  (CAMARA stand-in)  │  unmodified) │               │ panel +   │
+│  sim)        │                     └──────┬───────┘               │ AIA feed) │
+└──────┬───────┘                            │                       └───────────┘
+       │ sim:state, sim:raw_logs (Redis)    │ writes results               ▲
+       └────────────────────────────────────┼───────────────────────────────┘
+                                             ▼
+                                       TimescaleDB (eval framework reads from here)
 ```
 
 Five services, orchestrated with `docker compose`:
@@ -47,23 +48,38 @@ Then open **http://localhost:8080** for the dashboard.
 
 ## Using the dashboard
 
-1. **Start/Stop/Reset** control the simulation clock.
-2. **Environment Temperature** (Normal/High/Extreme) drives the shared
-   desert ambient temperature, which feeds both the physics (thermal
-   effects) and the simulated cellular network (heat degrades signal).
-3. **Scenario Control Panel**: pick a cluster, a fault type, and a
-   magnitude (where applicable), then **Inject Fault**. The pipeline
-   diagram node for that cluster will change color once the AIA has
-   investigated it (green = normal, yellow/orange/red = Tier 1/2/3
-   confirmed anomaly, gray = instrument fault, blue = connectivity
-   artifact / insufficient data).
-4. **Simulate Outage** / **Clear Outage** simulates the Nokia NaC CAMARA
-   platform itself failing for the selected cluster (distinct from a
-   fault that just makes the *reading* say UNREACHABLE) -- this is what
-   drives the AIA's `insufficient_data` path.
-5. The **Anomaly Investigation Feed** shows each investigated cluster's
-   classification, tier, confidence score, and the AIA's Operator
-   Justification Memo, live, as results arrive.
+The UI is split into two clearly separate domains, matching the intended
+architecture: the testbed only ever produces **physical simulation** state
+and **raw evidence**; the **cybersecurity verdict** always comes from the
+Anomaly Investigation Agent, never from the testbed itself.
+
+**Left: Physical Simulation** (the simulated industrial environment)
+1. **Start/Stop/Reset** (top bar) control the simulation clock.
+2. **3D pipeline view**: a live digital twin — water particles flow through
+   each pipe at a speed driven by the real simulated flow rate, pumps spin,
+   valve gates react to valve-type faults, and a leak fault produces a
+   visible particle spray at the leak point. This is ground-truth physics,
+   not a diagnosis — nothing here is colored by severity.
+3. **Environment Temperature** (Normal/High/Extreme) drives the shared
+   desert ambient temperature, feeding both the physics and the simulated
+   cellular network.
+4. **Scenario Control Panel**: pick a cluster, fault type, and magnitude,
+   then **Inject Fault**. **Simulate NaC Outage** independently fails the
+   simulated Nokia NaC platform for the selected cluster.
+5. **Raw Sensor Log Stream**: the literal, uninterpreted per-device logs
+   (pressure/flow/temperature/connectivity, one line per device) flowing
+   out of the simulator — the same evidence the AIA receives. No log line
+   here ever says "anomaly" or assigns a severity.
+
+**Right: Cybersecurity Intelligence Layer** (the Anomaly Investigation Agent)
+6. **Investigation Feed** populates *only* when the AIA actually produces a
+   result for a batch — it starts empty, and injecting a fault does not by
+   itself put anything here. Each card shows the agent's classification,
+   tier, confidence, the CAMARA network diagnostics it used to disambiguate,
+   and its Operator Justification Memo (its reasoning). A small ring
+   overlay appears at the corresponding node in the 3D view only once a
+   verdict has actually been produced, color-coded by tier/classification —
+   the only place a cybersecurity color touches the 3D scene.
 
 ## Fault catalog
 
@@ -122,6 +138,35 @@ cd dashboard/app
 SIMULATOR_URL=http://127.0.0.1:8000 AIA_SERVICE_URL=http://127.0.0.1:8001 \
   REDIS_URL=redis://127.0.0.1:6379/0 uvicorn main:app --port 8080
 ```
+
+## Architectural principle: the testbed never decides
+
+This is the most important property of the system, and it's enforced
+structurally, not just by convention:
+
+- The simulator's job stops at **Simulate → Measure → Generate telemetry/logs
+  → Send logs**. It has no anomaly-detection or alerting code anywhere —
+  `simulator/app/raw_logs.py` and `telemetry.py` only ever report literal
+  sensor values and device status (`operational` / `stale` / `fault`,
+  derived purely from whether *that device's own hardware/comms* is
+  working, never from whether the reading "looks wrong").
+- Fault injection changes physics and network conditions immediately (so
+  the 3D view and raw logs react in real time, as they should — a real
+  plant would too), but it never writes a classification anywhere. The
+  dashboard's investigation feed and the 3D view's verdict ring are driven
+  exclusively by `aia:results` messages published by `aia-service` *after*
+  the AIA has actually processed a batch — there is no code path that
+  short-circuits from "fault injected" to "alert shown".
+- All alert classification (`confirmed_anomaly` + Tier 1/2/3,
+  `confirmed_instrument_fault`, `likely_connectivity_artifact`,
+  `insufficient_data`) is produced exclusively by the unmodified `aia`
+  package. The testbed does not contain a second detection mechanism.
+
+You can verify this yourself: `redis-cli subscribe sim:raw_logs` streams
+continuously and immediately on fault injection, while `aia:results` only
+appears once the AIA has actually run its 4-stage pipeline on a later
+batch — often several seconds afterward, exactly as it would against a
+real plant.
 
 ## Design notes
 
