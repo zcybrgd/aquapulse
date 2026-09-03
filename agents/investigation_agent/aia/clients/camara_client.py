@@ -1,583 +1,182 @@
 from __future__ import annotations
 
 import os
-import random
-from dataclasses import dataclass, field
-from typing import Protocol
+from pathlib import Path
 
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from network_as_code import NetworkAsCodeApi
 
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../camara-integration/src/clients")))
-from device_reachability import DeviceReachabilityClient
+from .device_reachability import DeviceReachabilityClient
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
-from aia.config import (
-    CONGESTION_HIGH,
-    CONGESTION_LOW,
-    CONGESTION_MEDIUM,
-)
-from aia.models import (
-    CongestionLevel,
-    ReachabilityStatus,
-)
+# ---------------------------------------------------------------------------
+# FastAPI application
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="investigation-agent")
 
 
-# =============================================================================
-# Configuration
-# =============================================================================
-
-load_dotenv(find_dotenv())
+# ---------------------------------------------------------------------------
+# Nokia Network-as-Code client
+# ---------------------------------------------------------------------------
 
 RAPIDAPI_KEY = os.environ["RAPIDAPI_KEY"]
+# Fail fast if the API key is missing.
+# The service must never run unauthenticated.
 
-NOKIA_RAPIDAPI_HOST = os.getenv(
-    "NOKIA_RAPIDAPI_HOST",
-    "network-as-code.nokia.rapidapi.com",
+network_client = NetworkAsCodeApi(
+    rapidapi_host="network-as-code.nokia.rapidapi.com",
+    api_key=RAPIDAPI_KEY,
 )
 
 
-# =============================================================================
-# Exceptions
-# =============================================================================
+# ---------------------------------------------------------------------------
+# CAMARA clients
+# ---------------------------------------------------------------------------
+
+device_reachability_client = DeviceReachabilityClient(network_client)
 
 
-class CamaraApiError(Exception):
-    """
-    Raised internally by CAMARA client implementations.
-
-    Exceptions are caught by the safe_* wrappers and converted into
-    structured results for the application.
-    """
-
-
-# =============================================================================
-# Result Models
-# =============================================================================
-
-
-@dataclass
-class ReachabilityResult:
-    """
-    Result returned by the CAMARA Device Reachability Status API.
-    """
-
-    status: ReachabilityStatus | None
-    api_unavailable: bool
-    error_detail: str | None = None
-
-
-@dataclass
-class CongestionResult:
-    """
-    Result returned by the CAMARA Congestion Insights API.
-    """
-
-    level: CongestionLevel | None
-    api_unavailable: bool
-    error_detail: str | None = None
-
-
-# =============================================================================
-# CAMARA Client Interface
-# =============================================================================
-
-
-class CamaraClient(Protocol):
-    """
-    Application-level interface for CAMARA functionality.
-
-    The rest of the application depends on this interface rather than on
-    Nokia-specific SDK classes.
-
-    Implementations can therefore be:
-
-        - MockCamaraClient for testing
-        - NokiaCamaraClient for the real CAMARA/Nokia integration
-    """
-
-    def get_device_reachability_status(
-        self,
-        sensor_cluster_id: str,
-    ) -> ReachabilityResult:
-        ...
-
-    def get_congestion_insights(
-        self,
-        sensor_cluster_id: str,
-    ) -> CongestionResult:
-        ...
-
-
-# =============================================================================
-# Safe CAMARA Operations
-# =============================================================================
-
-
-def safe_get_device_reachability_status(
-    client: CamaraClient,
-    sensor_cluster_id: str,
-) -> ReachabilityResult:
-    """
-    Safely retrieve Device Reachability Status.
-
-    Any CAMARA/Nokia error is converted into a structured result instead
-    of propagating the exception to the application.
-    """
-
-    try:
-        return client.get_device_reachability_status(
-            sensor_cluster_id
-        )
-
-    except Exception as exc:
-        return ReachabilityResult(
-            status=None,
-            api_unavailable=True,
-            error_detail=str(exc),
-        )
-
-
-def safe_get_congestion_insights(
-    client: CamaraClient,
-    sensor_cluster_id: str,
-) -> CongestionResult:
-    """
-    Safely retrieve Congestion Insights.
-
-    Any CAMARA/Nokia error is converted into a structured result instead
-    of propagating the exception to the application.
-    """
-
-    try:
-        return client.get_congestion_insights(
-            sensor_cluster_id
-        )
-
-    except Exception as exc:
-        return CongestionResult(
-            level=None,
-            api_unavailable=True,
-            error_detail=str(exc),
-        )
-
-
-# =============================================================================
-# Nokia Device Mapping
-# =============================================================================
-
-"""
-Application-level sensor/device IDs mapped to the Nokia Network as Code
-test-device identifiers.
-
-The mapping is kept inside the CAMARA integration layer so that the rest
-of the application does not need to know about Nokia-specific identifiers.
-"""
+# ---------------------------------------------------------------------------
+# Device mapping
+# ---------------------------------------------------------------------------
+#
+# The industrial application works with its own device/sensor identifiers.
+# Nokia Network-as-Code expects the corresponding network identifier.
+#
+# Keep this mapping here for the simulated testbed. In a production
+# deployment, this should normally come from the site's asset registry
+# or another configuration/database layer.
+# ---------------------------------------------------------------------------
 
 DEVICE_ID_MAP: dict[str, str] = {
     "device-14-valve-A": "+99999991001",
     "device-offline-demo": "+99999991003",
-
-    # This device intentionally uses the same Nokia test device as the
-    # reachable device. Any downstream failure is simulated by the
-    # application/testbed rather than by CAMARA.
     "device-14-valve-A-fail": "+99999991001",
 }
 
 
-def get_phone_number(sensor_cluster_id: str) -> str:
-    """
-    Resolve an application-level sensor/device ID to its Nokia test-device
-    identifier.
-    """
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    phone_number = DEVICE_ID_MAP.get(sensor_cluster_id)
+def get_phone_number(device_id: str) -> str:
+    """
+    Resolve an industrial device ID to its Nokia Network-as-Code
+    network identifier.
+    """
+    phone_number = DEVICE_ID_MAP.get(device_id)
 
     if phone_number is None:
-        raise CamaraApiError(
-            f"No Nokia test-device mapping for '{sensor_cluster_id}'"
+        raise HTTPException(
+            status_code=404,
+            detail=f"No Nokia test-device mapping for '{device_id}'",
         )
 
     return phone_number
 
 
-# =============================================================================
-# Mock CAMARA Client
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Device Reachability Status
+# ---------------------------------------------------------------------------
 
-
-@dataclass
-class MockCamaraClient:
+@app.get("/v1/device-reachability/{device_id}")
+def get_device_reachability(device_id: str) -> dict:
     """
-    Deterministic mock CAMARA client.
-
-    Used for:
-
-        - unit tests
-        - integration tests
-        - anomaly-investigation scenarios
-        - CAMARA outage simulation
-        - local development without Nokia API access
-
-    Example:
-
-        MockCamaraClient(
-            overrides={
-                "cluster-desert-042": {
-                    "reachability": ReachabilityStatus.REACHABLE,
-                    "congestion": CongestionLevel.LOW,
-                }
-            }
-        )
-
-    To simulate a CAMARA API outage:
-
-        MockCamaraClient(
-            overrides={
-                "cluster-desert-042": {
-                    "raise": True,
-                }
-            }
-        )
+    Retrieve the connectivity status of an industrial device
+    through Nokia Network-as-Code.
     """
 
-    overrides: dict[str, dict] = field(default_factory=dict)
-    seed: int = 7
+    phone_number = get_phone_number(device_id)
 
-    def __post_init__(self) -> None:
-        self._rng = random.Random(self.seed)
-
-    def get_device_reachability_status(
-        self,
-        sensor_cluster_id: str,
-    ) -> ReachabilityResult:
-
-        cfg = self.overrides.get(sensor_cluster_id, {})
-
-        if cfg.get("raise"):
-            raise CamaraApiError(
-                f"Simulated Nokia NaC outage for {sensor_cluster_id}"
-            )
-
-        status = cfg.get("reachability")
-
-        if status is None:
-            status = self._rng.choice(
-                [
-                    ReachabilityStatus.REACHABLE,
-                    ReachabilityStatus.UNREACHABLE,
-                ]
-            )
-
-        return ReachabilityResult(
-            status=status,
-            api_unavailable=False,
-        )
-
-    def get_congestion_insights(
-        self,
-        sensor_cluster_id: str,
-    ) -> CongestionResult:
-
-        cfg = self.overrides.get(sensor_cluster_id, {})
-
-        if cfg.get("raise"):
-            raise CamaraApiError(
-                f"Simulated Nokia NaC outage for {sensor_cluster_id}"
-            )
-
-        level = cfg.get("congestion")
-
-        if level is None:
-            level = self._rng.choice(
-                [
-                    CongestionLevel.LOW,
-                    CongestionLevel.MEDIUM,
-                    CongestionLevel.HIGH,
-                ]
-            )
-
-        return CongestionResult(
-            level=level,
-            api_unavailable=False,
-        )
-
-
-# =============================================================================
-# Real Nokia CAMARA Client
-# =============================================================================
-
-
-class NokiaCamaraClient:
-    """
-    Real CAMARA client backed by Nokia Network as Code.
-
-    Architecture:
-
-        Application
-             |
-             v
-        CamaraClient
-             |
-             v
-        NokiaCamaraClient
-             |
-             v
-        NetworkAsCodeApi
-             |
-             v
-        DeviceReachabilityClient
-             |
-             v
-        Nokia Network as Code
-    """
-
-    def __init__(
-        self,
-        network_client: NetworkAsCodeApi,
-        device_reachability_client: DeviceReachabilityClient,
-    ) -> None:
-
-        self._network_client = network_client
-        self._device_reachability_client = device_reachability_client
-
-    def get_device_reachability_status(
-        self,
-        sensor_cluster_id: str,
-    ) -> ReachabilityResult:
-
-        phone_number = get_phone_number(sensor_cluster_id)
-
-        try:
-            status = (
-                self._device_reachability_client
-                .get_device_connectivity(phone_number)
-            )
-
-        except Exception as exc:
-            raise CamaraApiError(
-                f"Nokia NaC reachability call failed: {exc}"
-            ) from exc
-
-        reachable = bool(
-            getattr(status, "reachable", False)
-        )
-
-        return ReachabilityResult(
-            status=(
-                ReachabilityStatus.REACHABLE
-                if reachable
-                else ReachabilityStatus.UNREACHABLE
-            ),
-            api_unavailable=False,
-        )
-
-    def get_congestion_insights(
-        self,
-        sensor_cluster_id: str,
-    ) -> CongestionResult:
-
-        """
-        Retrieve Congestion Insights.
-
-        The first script's Nokia integration does not provide a concrete
-        Nokia SDK client for Congestion Insights. Therefore, the method
-        preserves the second script's interface without inventing a
-        Nokia implementation that has not been established.
-
-        Replace this implementation with the actual Nokia/CAMARA
-        Congestion Insights client once its SDK/API integration is
-        confirmed.
-        """
-
-        # Keep the application-level behavior explicit rather than
-        # returning a fabricated congestion level.
-        raise CamaraApiError(
-            "Nokia CAMARA Congestion Insights integration is not "
-            "configured yet."
-        )
-
-
-# =============================================================================
-# Nokia CAMARA Client Factory
-# =============================================================================
-
-
-def create_nokia_camara_client() -> NokiaCamaraClient:
-    """
-    Create the real Nokia Network as Code CAMARA client.
-
-    This follows the same initialization pattern as the first script.
-    """
-
-    network_client = NetworkAsCodeApi(
-        rapidapi_host=NOKIA_RAPIDAPI_HOST,
-        api_key=RAPIDAPI_KEY,
-    )
-
-    device_reachability_client = DeviceReachabilityClient(
-        network_client
-    )
-
-    return NokiaCamaraClient(
-        network_client=network_client,
-        device_reachability_client=device_reachability_client,
-    )
-
-
-# =============================================================================
-# Default CAMARA Client
-# =============================================================================
-
-camara_client: CamaraClient = create_nokia_camara_client()
-
-import random
-from dataclasses import dataclass, field
-from typing import Callable, Optional, Protocol
-
-from aia.config import CONGESTION_HIGH, CONGESTION_LOW, CONGESTION_MEDIUM
-from aia.models import CongestionLevel, ReachabilityStatus
-
-
-class CamaraApiError(Exception):
-    """Raised internally by client implementations; always caught at the call site."""
-
-
-@dataclass
-class ReachabilityResult:
-    status: Optional[ReachabilityStatus]
-    api_unavailable: bool
-    error_detail: Optional[str] = None
-
-
-@dataclass
-class CongestionResult:
-    level: Optional[CongestionLevel]
-    api_unavailable: bool
-    error_detail: Optional[str] = None
-
-
-class CamaraClient(Protocol):
-    def get_device_reachability_status(self, sensor_cluster_id: str) -> ReachabilityResult: ...
-    def get_congestion_insights(self, sensor_cluster_id: str) -> CongestionResult: ...
-
-
-def safe_get_device_reachability_status(
-    client: CamaraClient, sensor_cluster_id: str
-) -> ReachabilityResult:
-    """try/except wrapper around Device Reachability Status."""
     try:
-        return client.get_device_reachability_status(sensor_cluster_id)
-    except Exception as exc: 
-        return ReachabilityResult(status=None, api_unavailable=True, error_detail=str(exc))
-
-
-def safe_get_congestion_insights(
-    client: CamaraClient, sensor_cluster_id: str
-) -> CongestionResult:
-    """try/except wrapper around Congestion Insights."""
-    try:
-        return client.get_congestion_insights(sensor_cluster_id)
-    except Exception as exc: 
-        return CongestionResult(level=None, api_unavailable=True, error_detail=str(exc))
-
-@dataclass
-class MockCamaraClient:
-    """
-    Deterministic mock CAMARA client.
-
-    `overrides` lets tests pin exact responses per cluster id, e.g.:
-
-        MockCamaraClient(overrides={
-            "cluster-desert-042": {
-                "reachability": ReachabilityStatus.REACHABLE,
-                "congestion": CongestionLevel.LOW,
-            }
-        })
-
-    Setting `"raise": True` for a cluster simulates an API outage
-    (Scenario D), which the safe_* wrappers above convert to
-    api_unavailable=True.
-    """
-    overrides: dict[str, dict] = field(default_factory=dict)
-    seed: int = 7
-
-    def __post_init__(self) -> None:
-        self._rng = random.Random(self.seed)
-
-    def get_device_reachability_status(self, sensor_cluster_id: str) -> ReachabilityResult:
-        cfg = self.overrides.get(sensor_cluster_id, {})
-        if cfg.get("raise"):
-            raise CamaraApiError(f"Simulated Nokia NaC outage for {sensor_cluster_id}")
-        status = cfg.get("reachability")
-        if status is None:
-            status = self._rng.choice([ReachabilityStatus.REACHABLE, ReachabilityStatus.UNREACHABLE])
-        return ReachabilityResult(status=status, api_unavailable=False)
-
-    def get_congestion_insights(self, sensor_cluster_id: str) -> CongestionResult:
-        cfg = self.overrides.get(sensor_cluster_id, {})
-        if cfg.get("raise"):
-            raise CamaraApiError(f"Simulated Nokia NaC outage for {sensor_cluster_id}")
-        level = cfg.get("congestion")
-        if level is None:
-            level = self._rng.choice([CongestionLevel.LOW, CongestionLevel.MEDIUM, CongestionLevel.HIGH])
-        return CongestionResult(level=level, api_unavailable=False)
-
-
-
-class HttpCamaraClient:
-    """
-    Thin HTTP wrapper around the Nokia NaC CAMARA Device Reachability Status
-    and Congestion Insights APIs. Endpoint paths follow the CAMARA API Hub
-    naming convention; confirm exact paths/schemas against the live sandbox
-    per Section 9 Phase 1 before relying on this in production, since path
-    and payload details vary by NaC deployment/tenant.
-    """
-
-    def __init__(
-        self,
-        base_url: str,
-        token_provider: Callable[[], str],
-        timeout_seconds: float = 3.0,
-    ):
-        import httpx  # imported lazily so httpx is an optional dependency
-
-        self._httpx = httpx
-        self._base_url = base_url.rstrip("/")
-        self._token_provider = token_provider
-        self._timeout = timeout_seconds
-
-    def _headers(self) -> dict:
-        return {"Authorization": f"Bearer {self._token_provider()}"}
-
-    def get_device_reachability_status(self, sensor_cluster_id: str) -> ReachabilityResult:
-        resp = self._httpx.post(
-            f"{self._base_url}/device-reachability-status/v0/retrieve",
-            json={"device": {"networkAccessIdentifier": sensor_cluster_id}},
-            headers=self._headers(),
-            timeout=self._timeout,
+        status = device_reachability_client.get_device_connectivity(
+            phone_number
         )
-        resp.raise_for_status()
-        payload = resp.json()
-        raw_status = str(payload.get("reachabilityStatus", "")).upper()
-        status = ReachabilityStatus.REACHABLE if raw_status == "REACHABLE" else ReachabilityStatus.UNREACHABLE
-        return ReachabilityResult(status=status, api_unavailable=False)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Nokia NaC Device Reachability call failed: {exc}",
+        ) from exc
 
-    def get_congestion_insights(self, sensor_cluster_id: str) -> CongestionResult:
-        resp = self._httpx.post(
-            f"{self._base_url}/congestion-insights/v0/insights",
-            json={"device": {"networkAccessIdentifier": sensor_cluster_id}},
-            headers=self._headers(),
-            timeout=self._timeout,
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        raw_level = str(payload.get("congestionLevel", "")).upper()
-        level_map = {
-            CONGESTION_HIGH: CongestionLevel.HIGH,
-            CONGESTION_MEDIUM: CongestionLevel.MEDIUM,
-            CONGESTION_LOW: CongestionLevel.LOW,
-        }
-        level = level_map.get(raw_level, CongestionLevel.UNAVAILABLE)
-        return CongestionResult(level=level, api_unavailable=False)
+    reachable = bool(
+        getattr(status, "reachable", False)
+    )
+
+    connectivity = (
+        getattr(status, "connectivity", None)
+        or []
+    )
+
+    return {
+        "device_id": device_id,
+        "reachable": reachable,
+        "signal_quality": (
+            ",".join(connectivity)
+            if connectivity
+            else "NONE"
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Congestion Insights
+# ---------------------------------------------------------------------------
+#
+# IMPORTANT:
+# The exact Nokia Network-as-Code Python SDK client/method for Congestion
+# Insights depends on the SDK/API version being used.
+#
+# Do not implement this by making a direct httpx request: the integration
+# service is intentionally based on NetworkAsCodeApi, following the
+# architecture of the first script.
+#
+# Once the corresponding SDK client is available, initialize it above:
+#
+#     congestion_client = CongestionInsightsClient(network_client)
+#
+# and replace the implementation below with:
+#
+#     insights = congestion_client.get_congestion_insights(phone_number)
+#
+# ---------------------------------------------------------------------------
+
+@app.get("/v1/congestion-insights/{device_id}")
+def get_congestion_insights(device_id: str) -> dict:
+    """
+    Retrieve congestion information for an industrial device.
+
+    The endpoint is intentionally exposed as part of the FastAPI service,
+    but the actual SDK call must use the Congestion Insights client exposed
+    by the installed Nokia Network-as-Code SDK version.
+    """
+
+    phone_number = get_phone_number(device_id)
+
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Congestion Insights is not implemented because the installed "
+            "Nokia Network-as-Code SDK client for this capability has not "
+            "been verified. Configure the corresponding SDK client instead "
+            "of using a direct HTTP implementation."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Health check
+# ---------------------------------------------------------------------------
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {
+        "status": "ok",
+    }

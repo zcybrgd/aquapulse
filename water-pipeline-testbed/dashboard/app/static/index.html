@@ -7,6 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="/static/style.css" />
+<script>
+  // Applied synchronously, before first paint, so a returning visitor who
+  // chose light mode never sees a flash of the dark theme. Dark remains the
+  // default for first-time visitors (no stored preference).
+  (function () {
+    try {
+      var stored = localStorage.getItem("aquapulse-theme");
+      if (stored === "light") document.documentElement.setAttribute("data-theme", "light");
+    } catch (e) {}
+  })();
+</script>
 <script type="importmap">
 {
   "imports": {
@@ -43,6 +54,11 @@
     </div>
 
     <div class="topbar-actions">
+      <button class="btn btn--icon btn--theme" id="btn-theme-toggle" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+        <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 4.5a1 1 0 0 1-1-1V2a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1zm0 15a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm9-7.5a1 1 0 0 1-1 1h-1.5a1 1 0 1 1 0-2H20a1 1 0 0 1 1 1zm-15 0a1 1 0 0 1-1 1H3.5a1 1 0 1 1 0-2H5a1 1 0 0 1 1 1zm11.03-6.03a1 1 0 0 1 0 1.42l-1.06 1.06a1 1 0 1 1-1.42-1.42l1.06-1.06a1 1 0 0 1 1.42 0zM7.45 16.55a1 1 0 0 1 0 1.42l-1.06 1.06a1 1 0 1 1-1.42-1.42l1.06-1.06a1 1 0 0 1 1.42 0zm9.1 1.42a1 1 0 0 1-1.42 0l-1.06-1.06a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1 0 1.42zM7.45 7.45a1 1 0 0 1-1.42 0L4.97 6.39a1 1 0 1 1 1.42-1.42l1.06 1.06a1 1 0 0 1 0 1.42zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21.64 13a9 9 0 1 1-10.63-10.6 1 1 0 0 1 1.11 1.44A7 7 0 1 0 20.2 11.9a1 1 0 0 1 1.44 1.1z"/></svg>
+      </button>
+      <span class="topbar-divider"></span>
       <button class="btn btn--icon" id="btn-start" title="Start simulation" aria-label="Start">
         <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
       </button>

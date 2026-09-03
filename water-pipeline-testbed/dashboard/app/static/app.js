@@ -198,6 +198,7 @@ function connectWebSocket() {
 }
 
 function wireControlPanel() {
+  wireThemeToggle();
   document.getElementById("btn-start").onclick = () => fetch("/api/control/start", { method: "POST" });
   document.getElementById("btn-stop").onclick = () => fetch("/api/control/stop", { method: "POST" });
   document.getElementById("btn-reset").onclick = async () => {
@@ -262,6 +263,41 @@ function syncOutageButtonLabel() {
   const cluster_id = document.getElementById("sel-cluster").value;
   const btn = document.getElementById("btn-outage-toggle");
   btn.textContent = state.outageClusters.has(cluster_id) ? "Clear NaC Outage" : "Simulate NaC Outage";
+}
+
+function getCurrentTheme() {
+  return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+}
+
+function applyTheme(theme) {
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+  const btn = document.getElementById("btn-theme-toggle");
+  btn.setAttribute("aria-label", theme === "light" ? "Switch to dark mode" : "Switch to light mode");
+  btn.title = theme === "light" ? "Switch to dark mode" : "Switch to light mode";
+  if (window.PipelineScene && state.sceneReady && window.PipelineScene.setTheme) {
+    window.PipelineScene.setTheme(theme);
+  }
+}
+
+function wireThemeToggle() {
+  // The inline script in <head> already applied any stored preference
+  // before first paint; this just syncs the button label/icon to match.
+  applyTheme(getCurrentTheme());
+
+  document.getElementById("btn-theme-toggle").onclick = () => {
+    const next = getCurrentTheme() === "light" ? "dark" : "light";
+    applyTheme(next);
+    try {
+      localStorage.setItem("aquapulse-theme", next);
+    } catch (e) {
+      // localStorage unavailable (private browsing, etc.) -- theme still
+      // applies for this session, it just won't persist across reloads.
+    }
+  };
 }
 
 (async function initApp() {

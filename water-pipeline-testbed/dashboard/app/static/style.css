@@ -11,16 +11,40 @@
 
   --accent-physical: #2dd4bf;
   --accent-physical-dim: rgba(45, 212, 191, 0.12);
+  --accent-physical-border: rgba(45, 212, 191, 0.3);
+  --accent-physical-hover: #35e0c9;
   --accent-cyber: #8b8ff0;
   --accent-cyber-dim: rgba(139, 143, 240, 0.12);
+  --accent-cyber-border: rgba(139, 143, 240, 0.3);
 
   --tier-1: #eab308;
+  --tier-1-bg: rgba(234, 179, 8, 0.12);
   --tier-2: #f97316;
+  --tier-2-bg: rgba(249, 115, 22, 0.12);
   --tier-3: #ef4444;
+  --tier-3-bg: rgba(239, 68, 68, 0.12);
   --status-instrument: #94a3b8;
+  --status-instrument-bg: rgba(148, 163, 184, 0.12);
   --status-artifact: #38bdf8;
+  --status-artifact-bg: rgba(56, 189, 248, 0.12);
   --status-insufficient: #a855f7;
+  --status-insufficient-bg: rgba(168, 85, 247, 0.12);
   --status-normal: #2dd4bf;
+
+  --chip-bg: rgba(255, 255, 255, 0.04);
+  --chip-neutral-bg: rgba(255, 255, 255, 0.06);
+
+  --btn-hover-border: #2a3341;
+  --btn-hover-bg: #171e2a;
+  --btn-primary-text: #05201c;
+
+  --scene-bg-a: #121826;
+  --scene-bg-b: #090b10;
+  --scene-hint-bg: rgba(10, 13, 19, 0.6);
+  --console-bg: #070911;
+
+  --grid-color-main: #232d3d;
+  --grid-color-sub: #161c27;
 
   --radius: 10px;
   --radius-sm: 6px;
@@ -28,7 +52,64 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* ------------------------------------------------------------ light theme
+   Same structure, same components, same layout -- only the palette changes.
+   Status/tier/accent colors get deeper, more saturated variants here (not
+   just the dark-mode hex reused at lower opacity) so text and chips keep
+   solid contrast against light panels, per WCAG AA-ish targets. */
+[data-theme="light"] {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-raised: #eef1f6;
+  --border: #dde3ec;
+  --border-soft: #e8ecf2;
+
+  --text-primary: #171d2b;
+  --text-secondary: #4c5568;
+  --text-muted: #8791a3;
+
+  --accent-physical: #0f8f82;
+  --accent-physical-dim: rgba(15, 143, 130, 0.10);
+  --accent-physical-border: rgba(15, 143, 130, 0.28);
+  --accent-physical-hover: #0d7d72;
+  --accent-cyber: #5457d1;
+  --accent-cyber-dim: rgba(84, 87, 209, 0.10);
+  --accent-cyber-border: rgba(84, 87, 209, 0.28);
+
+  --tier-1: #a15c07;
+  --tier-1-bg: rgba(161, 92, 7, 0.10);
+  --tier-2: #c2410c;
+  --tier-2-bg: rgba(194, 65, 12, 0.10);
+  --tier-3: #d92d2d;
+  --tier-3-bg: rgba(217, 45, 45, 0.10);
+  --status-instrument: #5b6577;
+  --status-instrument-bg: rgba(91, 101, 119, 0.10);
+  --status-artifact: #0576b5;
+  --status-artifact-bg: rgba(5, 118, 181, 0.10);
+  --status-insufficient: #8324c7;
+  --status-insufficient-bg: rgba(131, 36, 199, 0.10);
+  --status-normal: #0f8f82;
+
+  --chip-bg: rgba(15, 23, 42, 0.035);
+  --chip-neutral-bg: rgba(15, 23, 42, 0.05);
+
+  --btn-hover-border: #c7cfdc;
+  --btn-hover-bg: #e4e9f0;
+  --btn-primary-text: #ffffff;
+
+  --scene-bg-a: #e6eaf1;
+  --scene-bg-b: #d3dae3;
+  --scene-hint-bg: rgba(255, 255, 255, 0.78);
+  --console-bg: #eef1f6;
+
+  --grid-color-main: #c3ccd9;
+  --grid-color-sub: #d9e0e9;
+}
+
 * { box-sizing: border-box; }
+*, *::before, *::after {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -87,7 +168,8 @@ body {
 .status-dot--off { background: var(--text-muted); }
 .status-dot--on { background: var(--accent-physical); box-shadow: 0 0 0 3px var(--accent-physical-dim); }
 
-.topbar-actions { display: flex; gap: 8px; }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+.topbar-divider { width: 1px; height: 22px; background: var(--border); margin: 0 2px; }
 
 /* ---------------------------------------------------------------- buttons */
 
@@ -103,7 +185,7 @@ body {
   cursor: pointer;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
-.btn:hover { border-color: #2a3341; background: #171e2a; }
+.btn:hover { border-color: var(--btn-hover-border); background: var(--btn-hover-bg); }
 .btn:active { transform: translateY(0.5px); }
 
 .btn--icon {
@@ -113,13 +195,18 @@ body {
 .btn--icon svg { width: 16px; height: 16px; fill: var(--text-secondary); }
 .btn--icon:hover svg { fill: var(--text-primary); }
 
+.btn--theme .icon-sun { display: none; }
+.btn--theme .icon-moon { display: block; }
+[data-theme="light"] .btn--theme .icon-sun { display: block; }
+[data-theme="light"] .btn--theme .icon-moon { display: none; }
+
 .btn--primary {
   background: var(--accent-physical);
   border-color: var(--accent-physical);
-  color: #05201c;
+  color: var(--btn-primary-text);
   font-weight: 600;
 }
-.btn--primary:hover { background: #35e0c9; border-color: #35e0c9; }
+.btn--primary:hover { background: var(--accent-physical-hover); border-color: var(--accent-physical-hover); }
 
 .btn--ghost { background: transparent; }
 .btn--block { width: 100%; }
@@ -167,8 +254,8 @@ body {
   border-radius: 100px;
   border: 1px solid var(--border);
 }
-.domain-badge--physical { color: var(--accent-physical); border-color: rgba(45,212,191,0.3); background: var(--accent-physical-dim); }
-.domain-badge--cyber { color: var(--accent-cyber); border-color: rgba(139,143,240,0.3); background: var(--accent-cyber-dim); }
+.domain-badge--physical { color: var(--accent-physical); border-color: var(--accent-physical-border); background: var(--accent-physical-dim); }
+.domain-badge--cyber { color: var(--accent-cyber); border-color: var(--accent-cyber-border); background: var(--accent-cyber-dim); }
 
 /* ---------------------------------------------------------------- cards */
 
@@ -211,7 +298,7 @@ body {
   position: relative;
   width: 100%;
   height: 420px;
-  background: radial-gradient(circle at 30% 20%, #121826 0%, #090b10 75%);
+  background: radial-gradient(circle at 30% 20%, var(--scene-bg-a) 0%, var(--scene-bg-b) 75%);
 }
 .scene-container canvas { display: block; width: 100%; height: 100%; }
 .scene-hint {
@@ -220,7 +307,7 @@ body {
   left: 14px;
   font-size: 10.5px;
   color: var(--text-muted);
-  background: rgba(10, 13, 19, 0.6);
+  background: var(--scene-hint-bg);
   padding: 4px 8px;
   border-radius: 100px;
   pointer-events: none;
@@ -309,7 +396,7 @@ body {
   font-size: 11px;
   line-height: 1.6;
   color: var(--text-secondary);
-  background: #070911;
+  background: var(--console-bg);
   padding: 12px 16px;
   height: 200px;
   overflow-y: auto;
@@ -366,15 +453,15 @@ body {
 .feed-tier-badge {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   padding: 3px 8px; border-radius: 100px;
-  background: rgba(255,255,255,0.06);
+  background: var(--chip-neutral-bg);
   color: var(--text-secondary);
 }
-.tier-1 .feed-tier-badge { color: var(--tier-1); background: rgba(234,179,8,0.12); }
-.tier-2 .feed-tier-badge { color: var(--tier-2); background: rgba(249,115,22,0.12); }
-.tier-3 .feed-tier-badge { color: var(--tier-3); background: rgba(239,68,68,0.12); }
-.tag-instrument .feed-tier-badge { color: var(--status-instrument); background: rgba(148,163,184,0.12); }
-.tag-artifact .feed-tier-badge { color: var(--status-artifact); background: rgba(56,189,248,0.12); }
-.tag-insufficient .feed-tier-badge { color: var(--status-insufficient); background: rgba(168,85,247,0.12); }
+.tier-1 .feed-tier-badge { color: var(--tier-1); background: var(--tier-1-bg); }
+.tier-2 .feed-tier-badge { color: var(--tier-2); background: var(--tier-2-bg); }
+.tier-3 .feed-tier-badge { color: var(--tier-3); background: var(--tier-3-bg); }
+.tag-instrument .feed-tier-badge { color: var(--status-instrument); background: var(--status-instrument-bg); }
+.tag-artifact .feed-tier-badge { color: var(--status-artifact); background: var(--status-artifact-bg); }
+.tag-insufficient .feed-tier-badge { color: var(--status-insufficient); background: var(--status-insufficient-bg); }
 
 .feed-meta {
   font-size: 11px;
@@ -401,7 +488,7 @@ body {
   gap: 6px;
 }
 .evidence-chip {
-  background: rgba(255,255,255,0.04);
+  background: var(--chip-bg);
   border: 1px solid var(--border-soft);
   border-radius: 100px;
   padding: 2px 8px;

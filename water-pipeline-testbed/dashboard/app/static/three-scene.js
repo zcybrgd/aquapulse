@@ -22,7 +22,7 @@ const LEAK_PARTICLE_COUNT = 18;
 const PIPE_START_X = -8;
 const PIPE_END_X = 8;
 
-let scene, camera, renderer, controls, clock, containerEl;
+let scene, camera, renderer, controls, clock, containerEl, gridHelper;
 const clusterObjects = {};
 
 const TIER_COLORS = { 1: 0xeab308, 2: 0xf97316, 3: 0xef4444 };
@@ -32,6 +32,38 @@ const CLASS_COLORS = {
   insufficient_data: 0xa855f7,
 };
 const LEAK_FAULT_TYPES = new Set(["leak", "pipe_rupture", "pressure_drop"]);
+
+const GRID_COLORS = {
+  dark: { main: 0x2a3446, sub: 0x161c27 },
+  light: { main: 0xb9c2d0, sub: 0xdde3ec },
+};
+
+function readInitialTheme() {
+  return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+}
+
+function applyGridTheme(theme) {
+  if (!scene) return;
+  if (gridHelper) {
+    scene.remove(gridHelper);
+    gridHelper.geometry.dispose();
+    gridHelper.material.dispose();
+  }
+  const colors = GRID_COLORS[theme] || GRID_COLORS.dark;
+  const grid = new THREE.GridHelper(44, 34, colors.main, colors.sub);
+  grid.material.transparent = true;
+  grid.material.opacity = theme === "light" ? 0.55 : 0.9;
+  scene.add(grid);
+  gridHelper = grid;
+}
+
+/** Called from app.js whenever the user flips the light/dark toggle. Only
+ * the grid needs to change here -- pipe/pump/valve materials are neutral
+ * industrial tones that read fine against either background, and the
+ * viewport's own background gradient is handled by CSS variables. */
+export function setTheme(theme) {
+  applyGridTheme(theme === "light" ? "light" : "dark");
+}
 
 export function init(container, segments) {
   containerEl = container;
@@ -64,6 +96,8 @@ export function init(container, segments) {
 
   const grid = new THREE.GridHelper(44, 34, 0x1c2531, 0x141a24);
   scene.add(grid);
+  gridHelper = grid;
+  applyGridTheme(readInitialTheme());
 
   buildReservoir();
   buildPipes(segments);
@@ -314,4 +348,4 @@ function onResize() {
   renderer.setSize(width, height);
 }
 
-window.PipelineScene = { init, updateCluster, setVerdict, clearAllVerdicts };
+window.PipelineScene = { init, updateCluster, setVerdict, clearAllVerdicts, setTheme };

@@ -70,6 +70,11 @@ Anomaly Investigation Agent, never from the testbed itself.
    (pressure/flow/temperature/connectivity, one line per device) flowing
    out of the simulator — the same evidence the AIA receives. No log line
    here ever says "anomaly" or assigns a severity.
+6. **Light/Dark mode**: toggle in the top bar (sun/moon icon). Dark is the
+   default; your choice persists across reloads via `localStorage`. Every
+   themed color — including status/tier colors — has a dedicated light-mode
+   variant tuned for contrast on a light background, not just the dark
+   palette reused at lower opacity.
 
 **Right: Cybersecurity Intelligence Layer** (the Anomaly Investigation Agent)
 6. **Investigation Feed** populates *only* when the AIA actually produces a
@@ -198,3 +203,16 @@ real plant.
   network loss, thermal degradation) is one `FaultEffect` entry in
   `faults.py`'s `FAULT_LIBRARY`, not a bespoke function -- adding a new
   scenario later is a data change, not a simulation-loop change.
+- **Theming is CSS custom properties, all the way down.** `style.css`
+  defines every color as a `--variable` in `:root` (dark, default) with a
+  `[data-theme="light"]` override block. Nothing in the rest of the
+  stylesheet, `three-scene.js`, or `app.js` hardcodes a color outside those
+  two blocks -- switching themes is one attribute flip on `<html>`, applied
+  before first paint via a small inline script in `index.html` (so a
+  returning visitor who chose light mode never sees a flash of dark). The
+  one place a *third* system needed to know about the change is the 3D
+  scene's grid lines (baked into GridHelper's vertex colors at construction,
+  not a CSS-stylable property), so `three-scene.js` exposes a small
+  `setTheme()` that rebuilds just the grid; everything else in the 3D view
+  (pipe/pump/valve materials, particles) is a neutral industrial tone that
+  reads fine against either background and needs no per-theme change.
