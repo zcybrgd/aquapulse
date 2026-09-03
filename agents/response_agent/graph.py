@@ -23,7 +23,6 @@ def jsonl_audit_sink(path: str = "audit_log.jsonl") -> Callable[[AuditLogEntry],
 
 def noop_override_poller(incident_id: str) -> Optional[str]:
     return None
-
 def build_actuation_graph( reachability_client: Optional[DeviceReachabilityClient] = None, notification_client: Optional[NotificationClient] = None,actuator_client: Optional[ValveActuatorClient] = None,audit_sink: Optional[Callable[[AuditLogEntry], None]] = None,override_poller: Optional[Callable[[str], Optional[str]]] = None,llm_chain=None,override_window_seconds: float = 120.0,poll_interval_seconds: float = 2.0,):
     reachability_client = reachability_client or DeviceReachabilityClient()
     notification_client = notification_client or NotificationClient()

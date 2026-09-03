@@ -16,9 +16,6 @@ class DeviceReachabilityClient:
         self._session.mount("https://", HTTPAdapter(max_retries=retries))
 
     def check(self, device_id: str) -> ReachabilityStatus:
-        """Query whether a device can currently be reached for a command
-        On any network-level failure (timeout, connection error, non-2xx
-        after retries) we treat the device as unreachable """
         url = f"{self.base_url}/v1/device-reachability/{device_id}"
         start = time.monotonic()
         try:

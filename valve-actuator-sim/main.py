@@ -11,6 +11,7 @@ class IsolateRequest(BaseModel):
     incident_id: str
     action: str  # "close"
 
+#a simple simulator of a physical valve controller
 @app.post("/v1/valve/isolate")
 def isolate(body: IsolateRequest) -> dict:
     if body.device_id.endswith("-fail"):
