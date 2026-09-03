@@ -11,7 +11,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 app = FastAPI(title="camara-integration")
 
-RAPIDAPI_KEY = os.environ["RAPIDAPI_KEY"]  # fail fast if missing — never run unauthenticated
+RAPIDAPI_KEY = os.environ["RAPIDAPI_KEY"]  
 network_client = NetworkAsCodeApi(rapidapi_host="network-as-code.nokia.rapidapi.com",api_key=RAPIDAPI_KEY,)
 device_reachability_client = DeviceReachabilityClient(network_client)
 qod_client = QodClient(network_client)
@@ -22,7 +22,6 @@ DEVICE_ID_MAP: dict[str, str] = {
     "device-14-valve-A-fail": "+99999991001",  # reachable; actuator sim forces the failure downstream
 }
 
-print("DEBUG: using", NetworkAsCodeApi)
 def get_phone_number(device_id: str) -> str:
     phone_number = DEVICE_ID_MAP.get(device_id)
     if phone_number is None:
@@ -40,8 +39,7 @@ def get_device_reachability(device_id: str) -> dict:
 
     reachable = bool(getattr(status, "reachable", False))
     connectivity = getattr(status, "connectivity", None) or []
-    return { "reachable": reachable,
-    "signal_quality": ",".join(connectivity) if connectivity else "NONE",}
+    return { "reachable": reachable,"signal_quality": ",".join(connectivity) if connectivity else "NONE",}
 
 @app.post("/v1/qod/{device_id}/reserve")
 def reserve_qod_session(device_id: str, application_server_ip: str, duration_seconds: int = 3600) -> dict:

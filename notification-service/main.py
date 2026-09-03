@@ -10,7 +10,6 @@ TWILIO_FROM = os.environ.get("TWILIO_FROM_NUMBER")
 _twilio_client = None
 if TWILIO_SID and TWILIO_TOKEN:
     from twilio.rest import Client as TwilioClient
-
     _twilio_client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
 
 class NotifyRequest(BaseModel):

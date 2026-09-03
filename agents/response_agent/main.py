@@ -3,7 +3,6 @@ import argparse
 import logging
 import sys
 import uuid
-
 from .graph import build_actuation_graph
 from .nodes.llm_response_planner import build_llm_decision_chain
 from .schemas import NetworkGrant, SeverityTier
@@ -20,8 +19,7 @@ SCENARIOS = {
     "tier2": dict(tier=SeverityTier.TIER_2_ALERT, device_id="device-14-valve-A"),
     "tier3": dict(tier=SeverityTier.TIER_3_AUTONOMOUS, device_id="device-14-valve-A"),
     "unreachable": dict(tier=SeverityTier.TIER_3_AUTONOMOUS, device_id="device-offline-demo"),
-    "actuator_failure": dict(tier=SeverityTier.TIER_3_AUTONOMOUS, device_id="device-14-valve-A-fail"),
-}
+    "actuator_failure": dict(tier=SeverityTier.TIER_3_AUTONOMOUS, device_id="device-14-valve-A-fail"),}
 
 
 def run_scenario( name: str, reachability_url: str, notification_url: str,actuator_url: str, override_seconds: float,) -> None:
@@ -38,17 +36,11 @@ def run_scenario( name: str, reachability_url: str, notification_url: str,actuat
     notification_client = NotificationClient(base_url=notification_url)
     actuator_client = ValveActuatorClient(base_url=actuator_url)
     llm_chain = build_llm_decision_chain()
-    app = build_actuation_graph(reachability_client=reachability_client,notification_client=notification_client,
-        actuator_client=actuator_client,llm_chain=llm_chain,
-        audit_sink=lambda entry: print(f"  [AUDIT] {entry.model_dump_json(indent=2)}"),
-        override_poller=lambda incident_id: "confirmed",override_window_seconds=override_seconds,)
-
+    app = build_actuation_graph(reachability_client=reachability_client,notification_client=notification_client, actuator_client=actuator_client,llm_chain=llm_chain,audit_sink=lambda entry: print(f"  [AUDIT] {entry.model_dump_json(indent=2)}"),override_poller=lambda incident_id: "confirmed",override_window_seconds=override_seconds,)
     initial_state = {"incident_id": incident_id,"cluster_id": cluster_id,"device_id": device_id,"severity_tier": tier,
     "network_grant": NetworkGrant( cluster_id=cluster_id, incident_id=incident_id,severity_tier=tier,guarantee_type="QoD", session_id=str(uuid.uuid4()),),"operator_contact": "+15550001234","reasoning_trace": [],}
-
     final_state = app.invoke(initial_state)
-
-    print("\n--- Reasoning trace ---")
+    print("\n- Reasoning trace ")
     for line in final_state["reasoning_trace"]:
         print(f"  - {line}")
     print(f"\nOperator message: {final_state.get('operator_message')}")
