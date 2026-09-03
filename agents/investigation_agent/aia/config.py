@@ -118,12 +118,12 @@ CONFIDENCE_WEIGHT_TREND = 0.20
 EXPECTED_TELEMETRY_WINDOW_LEN = 10  # "complete" window size for C_telemetry = 1.0
 
 # ---------------------------------------------------------------------------
-# Stage 4: AI Narration (OpenRouter-compatible)
+# Stage 4: AI Narration (Mistral API)
 # ---------------------------------------------------------------------------
-# OpenRouter exposes LLMs through an OpenAI-compatible API. Any model
-# available on https://openrouter.ai/models can be used here.
-LLM_MODEL = "mistralai/mistral-7b-instruct:free"
-LLM_BASE_URL = "https://openrouter.ai/api/v1/"
+# Using the official Mistral API. Any model available on the Mistral Platform
+# (e.g. open-mistral-7b, mistral-small-latest) can be used here.
+LLM_MODEL = "mistral-small-latest"
+LLM_BASE_URL = "https://api.mistral.ai/v1/chat/completions"
 LLM_MAX_TOKENS = 400
 
 # Prompt-injection guardrail (Section 6): only alnum + hyphen accepted for any

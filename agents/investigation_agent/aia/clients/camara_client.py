@@ -5,9 +5,11 @@ import random
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from network_as_code import NetworkAsCodeApi
 
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../camara-integration/src/clients")))
 from device_reachability import DeviceReachabilityClient
 
 
@@ -26,7 +28,7 @@ from aia.models import (
 # Configuration
 # =============================================================================
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 RAPIDAPI_KEY = os.environ["RAPIDAPI_KEY"]
 
@@ -429,7 +431,6 @@ def create_nokia_camara_client() -> NokiaCamaraClient:
 # =============================================================================
 
 camara_client: CamaraClient = create_nokia_camara_client()
-from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field

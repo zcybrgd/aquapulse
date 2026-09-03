@@ -1,20 +1,7 @@
-"""
-Stage 4: AI Narration & Output Compilation -- Section 5.4 / Section 6.
 
-The LLM is a strictly READ-ONLY narrator: it receives pre-computed
-classification/tier/metrics and turns them into a concise, professional
-"Operator Justification Memo". It never recalculates or second-guesses the
-deterministic Stage 3 outputs.
-
-Supports any OpenAI-compatible API (including OpenRouter) via the standard
-openai SDK. The `llm_client` parameter is an `openai.OpenAI()` instance.
-
-All field-sourced identifiers are sanitized before entering the prompt
-(Section 6, Ingestion String Sanitization).
-"""
 from __future__ import annotations
 
-from aia.config import LLM_MODEL
+from aia.config import LLM_BASE_URL, LLM_MODEL
 from aia.models import ClusterInvestigationState, sanitize_identifier
 
 NARRATION_SYSTEM_PROMPT = """You are the read-only narration layer of the AquaPulse Anomaly Investigation Agent (AIA).
@@ -70,12 +57,12 @@ Write the Operator Justification Memo now."""
 
 def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, model: str) -> str:
     """
-    Calls the OpenRouter API using the python requests library to produce the memo.
+    Calls the Mistral API using the python requests library to produce the memo.
     """
     import requests
     import json
     
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = LLM_BASE_URL
     headers = {
         "Authorization": f"Bearer {client_api_key}",
         "Content-Type": "application/json",
@@ -86,8 +73,7 @@ def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, mode
         "messages": [
             {"role": "system", "content": NARRATION_SYSTEM_PROMPT},
             {"role": "user", "content": _build_user_prompt(state)}
-        ],
-        "reasoning": {"enabled": True}
+        ]
     }
     
     response = requests.post(url, headers=headers, data=json.dumps(payload))
@@ -96,7 +82,7 @@ def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, mode
         data = response.json()
         return data['choices'][0]['message']['content'].strip()
     else:
-        raise Exception(f"OpenRouter API Error: {response.status_code} - {response.text}")
+        raise Exception(f"Mistral API Error: {response.status_code} - {response.text}")
 
 
 def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:

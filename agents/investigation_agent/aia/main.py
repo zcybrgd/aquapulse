@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
 from datetime import datetime, timedelta, timezone
 
 from aia.clients.camara_client import MockCamaraClient
@@ -86,9 +88,9 @@ def build_demo_camara_client() -> MockCamaraClient:
 
 
 def build_llm_client():
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+    api_key = os.environ.get("MISTRAL_API_KEY")
     if not api_key:
-        logging.getLogger("aia").warning("OPENROUTER_API_KEY not found; falling back to deterministic narrator.")
+        logging.getLogger("aia").warning("MISTRAL_API_KEY not found; falling back to deterministic narrator.")
         return None
         
     return api_key
