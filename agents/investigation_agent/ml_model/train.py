@@ -1,20 +1,4 @@
-"""
-Pipeline d'entraînement et d'évaluation des modèles de détection de fuites.
 
-Compare 3 approches :
-    1. Isolation Forest (unsupervised baseline)
-    2. Random Forest (supervised)
-    3. Gradient Boosting (supervised)
-
-Produit :
-    - Rapport de classification complet (precision, recall, F1)
-    - Matrice de confusion
-    - Feature importance
-    - Modèle sérialisé (.joblib) du meilleur modèle
-
-Usage:
-    python -m ml_model.train
-"""
 from __future__ import annotations
 
 import logging
@@ -70,6 +54,17 @@ def predict_isolation_forest(model: IsolationForest, X: np.ndarray) -> np.ndarra
     """Convertit les scores IF (-1=anomaly, 1=normal) en labels binaires (1=leak, 0=normal)."""
     raw = model.predict(X)
     return np.where(raw == -1, 1, 0)
+
+
+def score_isolation_forest(model: IsolationForest, X: np.ndarray) -> np.ndarray:
+    """Score continu 'probabilité de fuite' pour l'AUC-ROC.
+
+    model.score_samples(X) retourne un score où plus négatif = plus anormal
+    (convention scikit-learn pour IsolationForest). Comme leak=1 est notre
+    classe positive, on inverse le signe pour que score élevé = anomalie
+    probable = fuite probable, cohérent avec ce qu'attend roc_auc_score.
+    """
+    return -model.score_samples(X)
 
 
 def train_random_forest(X_train: np.ndarray, y_train: np.ndarray) -> RandomForestClassifier:
@@ -204,7 +199,8 @@ def main() -> None:
 
     # Isolation Forest
     y_pred_iso = predict_isolation_forest(iso_model, X_val)
-    results.append(evaluate_model("Isolation Forest", y_val, y_pred_iso))
+    y_score_iso = score_isolation_forest(iso_model, X_val)
+    results.append(evaluate_model("Isolation Forest", y_val, y_pred_iso, y_score_iso))
 
     # Random Forest
     y_pred_rf = rf_model.predict(X_val)
@@ -244,7 +240,7 @@ def main() -> None:
 
     if is_unsupervised:
         y_pred_test = predict_isolation_forest(best_model, X_test)
-        y_proba_test = None
+        y_proba_test = score_isolation_forest(best_model, X_test)
     else:
         y_pred_test = best_model.predict(X_test)
         y_proba_test = best_model.predict_proba(X_test)[:, 1]

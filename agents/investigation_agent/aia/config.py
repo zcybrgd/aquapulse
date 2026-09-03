@@ -122,8 +122,8 @@ EXPECTED_TELEMETRY_WINDOW_LEN = 10  # "complete" window size for C_telemetry = 1
 # ---------------------------------------------------------------------------
 # OpenRouter exposes LLMs through an OpenAI-compatible API. Any model
 # available on https://openrouter.ai/models can be used here.
-LLM_MODEL = "google/gemma-4-26b-a4b-it:free"
-LLM_BASE_URL = "https://openrouter.ai/api/v1"
+LLM_MODEL = "mistralai/mistral-7b-instruct:free"
+LLM_BASE_URL = "https://openrouter.ai/api/v1/"
 LLM_MAX_TOKENS = 400
 
 # Prompt-injection guardrail (Section 6): only alnum + hyphen accepted for any
