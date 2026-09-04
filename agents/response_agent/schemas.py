@@ -62,8 +62,6 @@ class ActuationResult(BaseModel):
     @field_validator("severity_tier", mode="before")
     @classmethod
     def enforce_ceiling(cls, v):
-        # Defensive backstop for any raw integer or external payload that slips in
-        # before the SeverityTier IntEnum coercion happens.
         if isinstance(v, int):
             if v > SeverityTier.TIER_3_AUTONOMOUS:
                 raise ValueError(f"Severity tier {v} exceeds the hard ceiling of "

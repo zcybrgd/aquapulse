@@ -1,9 +1,7 @@
-# response_agent/nodes/llm_decision.py
 from __future__ import annotations
 import logging
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
-
 from shared.llm_client import get_groq_llm
 from ..schemas import ActuationDecision, SeverityTier
 from ..state import ActuationState
@@ -19,7 +17,7 @@ You do NOT have final authority over physical actuation. Your job:
 3. Explain your reasoning using ONLY the facts provided. Never invent sensor readings, \
 device state, or history that was not given to you.
 
-Reference policy (a guardrail will enforce this regardless of what you output):
+Reference policy:
 - device unreachable  -> escalate_unreachable (never act blind)
 - tier 1 -> log_only
 - tier 2 -> alert_and_await
@@ -35,7 +33,18 @@ class LLMActuationDecision(BaseModel):
 def build_llm_decision_chain():
     llm = get_groq_llm()
     structured_llm = llm.with_structured_output(LLMActuationDecision)
-    prompt = ChatPromptTemplate.from_messages([("system", SYSTEM_PROMPT),("human", "incident_id: {incident_id}\n" "device_id: {device_id}\n""severity_tier: {severity_tier}\n""device_reachable: {reachable}\n""signal_quality: {signal_quality}\n""network_grant_active: {has_grant}\n""Propose the decision, draft the operator message, and explain your reasoning."),])
+    prompt = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_PROMPT),
+    ("human","incident_id: {incident_id}\n""device_id: {device_id}\n"
+     "severity_tier: {severity_tier}\n"
+     "device_reachable: {reachable}\n"
+     "signal_quality: {signal_quality}\n"
+     "network_guarantee_type: {guarantee_type}\n"
+     "network_denied_reason: {network_denied_reason}\n"
+     "network_fallback_channel: {network_fallback}\n"
+     "Propose the decision, draft the operator message, and explain your reasoning. "
+     "If the network guarantee was denied, mention in your reasoning that you are "
+    "acting without a guaranteed connection, and note this is elevated risk."),])
     return prompt | structured_llm
 
 
@@ -58,31 +67,35 @@ _FALLBACK_MESSAGES = {
 
 def make_llm_decision_node(chain=None):
     chain = chain or build_llm_decision_chain()
-
     def llm_decision_node(state: ActuationState) -> ActuationState:
         reachability = state["reachability"]
         tier: SeverityTier = state["severity_tier"]
         incident_id = state["incident_id"]
         trace = list(state.get("reasoning_trace", []))
-
+        grant = state.get("network_grant")
+        denied = state.get("network_denied")
+        if denied is not None:
+            trace.append(f"Network priority reservation DENIED ({denied.reason}); proceeding without "
+                         f"guaranteed bandwidth — fallback channel: {denied.fallback}.")
+        elif grant is not None:
+            trace.append(f"Network priority reservation ACTIVE (guarantee_type={grant.guarantee_type}, "
+                         f"session_id={grant.session_id}).")
+        else:
+            trace.append("No network reservation was requested or recorded for this incident.")
         try:
-            llm_out: LLMActuationDecision = chain.invoke({"incident_id": incident_id,"device_id": state["device_id"],"severity_tier": int(tier), "reachable": reachability.reachable,"signal_quality": reachability.raw_signal_quality,"has_grant": state.get("network_grant") is not None,})
+            llm_out: LLMActuationDecision =chain.invoke({"incident_id": incident_id,"device_id": state["device_id"],"severity_tier": int(tier),"reachable": reachability.reachable,"signal_quality": reachability.raw_signal_quality,"guarantee_type": grant.guarantee_type if grant else None,"network_denied_reason": denied.reason if denied else None,"network_fallback": denied.fallback if denied else None,})
             proposed, message, reasoning = llm_out.decision, llm_out.operator_message, llm_out.reasoning
         except Exception as exc:  # noqa: BLE001 : LLM failure must never block a safety response
-            logger.error("llm_decision_FAILED incident_id=%s error=%s — falling back to rule-based decision",
-                         incident_id, exc)
+            logger.error("llm_decision_FAILED incident_id=%s error=%s — falling back to rule-based decision",incident_id, exc)
             proposed = _enforce_guardrails(ActuationDecision.LOG_ONLY, tier, reachability.reachable)
             message = _FALLBACK_MESSAGES[proposed]
             reasoning = f"LLM call failed ({exc}); used deterministic fallback."
-
         decision = _enforce_guardrails(proposed, tier, reachability.reachable)
         if decision != proposed:
             trace.append(f"LLM proposed '{proposed}' but guardrail overrode to '{decision}' "
                          f"(tier={int(tier)}, reachable={reachability.reachable}).")
             message = _FALLBACK_MESSAGES[decision]
-
         trace.append(f"LLM reasoning: {reasoning}")
-
         return { **state, "decision": decision, "operator_message": message,
          "human_override_requested": decision == ActuationDecision.AUTONOMOUS_ISOLATE, "reasoning_trace": trace,}
 
