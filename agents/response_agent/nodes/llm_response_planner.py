@@ -1,6 +1,8 @@
 from __future__ import annotations
 import logging
+from pathlib import Path
 from pydantic import BaseModel, Field
+from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from shared.llm_client import get_groq_llm
 from ..schemas import ActuationDecision, SeverityTier
@@ -8,21 +10,7 @@ from ..state import ActuationState
 
 logger = logging.getLogger("actuation_agent.nodes.llm_decision")
 
-SYSTEM_PROMPT = """You are the Response Agent for AquaPulse, a water-pipeline leak alert system \
-operating in remote MENA desert pipelines.
-
-You do NOT have final authority over physical actuation. Your job:
-1. Confirm/propose the action tier given the facts below.
-2. Draft a short, clear operator notification message (SMS-length, no more than ~350 chars).
-3. Explain your reasoning using ONLY the facts provided. Never invent sensor readings, \
-device state, or history that was not given to you.
-
-Reference policy:
-- device unreachable  -> escalate_unreachable (never act blind)
-- tier 1 -> log_only
-- tier 2 -> alert_and_await
-- tier 3 -> autonomous_isolate
-"""
+SYSTEM_PROMPT = (Path(__file__).resolve().parents[1] / "prompt.md").read_text(encoding="utf-8")
 
 class LLMActuationDecision(BaseModel):
     decision: ActuationDecision
@@ -34,7 +22,7 @@ def build_llm_decision_chain():
     llm = get_groq_llm()
     structured_llm = llm.with_structured_output(LLMActuationDecision)
     prompt = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
+    SystemMessage(content=SYSTEM_PROMPT),
     ("human","incident_id: {incident_id}\n""device_id: {device_id}\n"
      "severity_tier: {severity_tier}\n"
      "device_reachable: {reachable}\n"
