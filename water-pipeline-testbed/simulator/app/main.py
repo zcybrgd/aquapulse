@@ -94,8 +94,7 @@ async def _publish_state() -> None:
                 "pressure_psi": c.reported_pressure_psi,
                 "flow_rate_lps": c.reported_flow_lps,
                 "ambient_temp_c": c.ambient_temp_c,
-                "active_fault": state.active_faults[cid].fault_type if cid in state.active_faults else None,
-                "magnitude": state.active_faults[cid].magnitude if cid in state.active_faults else None,
+                # REMOVED: "active_fault" and "magnitude" ground-truth leaks
             }
             for cid, c in state.clusters.items()
         },
@@ -105,7 +104,7 @@ async def _publish_state() -> None:
         await _redis.publish("sim:state", json.dumps(payload))
     except Exception:
         logger.exception("Failed to publish sim state to redis")
-
+        
 
 async def _publish_raw_logs() -> None:
     """

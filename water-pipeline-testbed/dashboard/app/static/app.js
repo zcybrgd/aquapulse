@@ -2,6 +2,7 @@ const state = {
   topology: [],
   faultsCatalog: {},
   latestReadouts: {},
+  agentVerdicts: {}, 
   outageClusters: new Set(),
   sceneReady: false,
 };
@@ -91,14 +92,21 @@ function renderReadouts() {
   tbody.innerHTML = "";
   for (const seg of state.topology) {
     const r = state.latestReadouts[seg.sensor_cluster_id] || {};
+    const verdict = state.agentVerdicts[seg.sensor_cluster_id];
+    
+    // Status is driven strictly by AIA Agent output
+    const faultLabel = verdict 
+      ? `${verdict.classification.replaceAll("_", " ")} (T${verdict.severity_tier})`
+      : "nominal";
+    const statusClass = verdict ? "state-fault" : "state-normal";
+
     const tr = document.createElement("tr");
-    const faultLabel = r.active_fault ? `${r.active_fault.replaceAll("_", " ")}${r.magnitude ? " (" + r.magnitude + ")" : ""}` : "nominal";
     tr.innerHTML = `
       <td>${seg.sensor_cluster_id}</td>
       <td>${fmt(r.pressure_psi)} psi</td>
       <td>${fmt(r.flow_rate_lps)} L/s</td>
       <td>${fmt(r.ambient_temp_c)}°C</td>
-      <td class="${r.active_fault ? "state-fault" : "state-normal"}">${faultLabel}</td>
+      <td class="${statusClass}">${faultLabel}</td>
     `;
     tbody.appendChild(tr);
   }
@@ -192,7 +200,11 @@ function connectWebSocket() {
     } else if (msg.type === "raw_logs") {
       for (const entry of msg.logs) appendRawLog(entry);
     } else if (msg.type === "aia_results") {
-      for (const threat of msg.investigated_threats) addFeedItem(threat);
+      for (const threat of msg.investigated_threats) {
+        state.agentVerdicts[threat.sensor_cluster_id] = threat;
+        addFeedItem(threat);
+      }
+      renderReadouts(); // Re-render table with AIA verdict
     }
   };
 }

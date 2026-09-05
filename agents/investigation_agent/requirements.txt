@@ -12,3 +12,4 @@ openai>=1.0
 # Testing
 pytest>=8.0
 pandas
+redis

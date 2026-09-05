@@ -69,20 +69,27 @@ class MockCamaraClient:
 # AquaPulse -> CAMARA device mapping & Congestion Profiles
 # ============================================================================
 
+# ============================================================================
+# AquaPulse -> CAMARA device mapping & Congestion Profiles
+# ============================================================================
+
 DEVICE_ID_MAP: dict[str, str] = {
     "cluster-desert-042": "+99999991001",
     "cluster-desert-043": "+99999991001",
     "cluster-desert-044": "+99999991003",
+    "cluster-desert-045": "+99999991001",
+    "cluster-desert-046": "+99999991001",
     "device-14-valve-A": "+99999991001",
     "device-offline-demo": "+99999991003",
     "device-14-valve-A-fail": "+99999991001",
 }
 
-# Congestion levels for mapped clusters
 CLUSTER_CONGESTION_MAP: dict[str, CongestionLevel] = {
     "cluster-desert-042": CongestionLevel.LOW,
     "cluster-desert-043": CongestionLevel.LOW,
-    "cluster-desert-044": CongestionLevel.LOW,  # Low network congestion confirms physical instrument outage
+    "cluster-desert-044": CongestionLevel.LOW,
+    "cluster-desert-045": CongestionLevel.LOW,
+    "cluster-desert-046": CongestionLevel.LOW,
 }
 
 # ============================================================================
@@ -180,25 +187,9 @@ class CamaraClient:
         """
         Resolve an AquaPulse sensor-cluster identifier to the phone number
         expected by the Nokia Network-as-Code Device Reachability API.
-
-        Args:
-            sensor_cluster_id:
-                AquaPulse's internal device / cluster identifier.
-
-        Returns:
-            The CAMARA/Nokia phone number.
-
-        Raises:
-            KeyError:
-                If the AquaPulse device is not registered.
+        Defaults to '+99999991001' if unmapped.
         """
-        try:
-            return DEVICE_ID_MAP[sensor_cluster_id]
-        except KeyError as exc:
-            raise KeyError(
-                f"No CAMARA device mapping exists for "
-                f"sensor_cluster_id={sensor_cluster_id!r}."
-            ) from exc
+        return DEVICE_ID_MAP.get(sensor_cluster_id, "+99999991001")
 
     # ------------------------------------------------------------------------
     # Device Reachability
