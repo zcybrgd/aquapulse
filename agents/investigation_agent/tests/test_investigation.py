@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from aia.camara_client import MockCamaraClient
-from aia.investigation import investigate
+from aia.nodes.investigation import investigate
 from aia.models import Classification, ClusterInvestigationState, CongestionLevel, ReachabilityStatus
 from tests.conftest import make_window
 
+from aia.clients.camara_client import MockCamaraClient
 
 def _state(cluster_id: str, temp_c: float) -> ClusterInvestigationState:
     window = make_window(cluster_id, [(30.0, 100.0, temp_c)])

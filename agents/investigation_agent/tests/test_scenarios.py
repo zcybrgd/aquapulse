@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from aia.camara_client import MockCamaraClient
+from aia.clients.camara_client import MockCamaraClient
 from aia.models import Classification, CongestionLevel, ReachabilityStatus, StreamingBatch
 from aia.pipeline import AnomalyInvestigationAgent
 from tests.conftest import make_window

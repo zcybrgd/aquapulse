@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from aia.models import Classification, ClusterInvestigationState, CongestionLevel, ReachabilityStatus
-from aia.risk import assess_risk
 from tests.conftest import make_window
+from aia.nodes.risk import assess_risk
 
 
 def _confirmed_state(cluster_id: str, values) -> ClusterInvestigationState:
@@ -33,7 +33,11 @@ def test_tier1_minor_low_criticality(topology):
 
 
 def test_tier2_moderate_criticality_two():
-    from aia.topology import ClusterTopologyMapping, InMemoryTopologyCache, SegmentTopology
+    from aia.clients.topology import (
+        ClusterTopologyMapping,
+        InMemoryTopologyCache,
+        SegmentTopology,
+    )
 
     topo = InMemoryTopologyCache()
     topo.load([
