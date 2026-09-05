@@ -3,15 +3,23 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dotenv import load_dotenv, find_dotenv
-load_dotenv(find_dotenv())
 from datetime import datetime, timedelta, timezone
+from dotenv import find_dotenv, load_dotenv
 
-from aia.clients.camara_client import MockCamaraClient
+load_dotenv(find_dotenv())
+
+from aia.clients.camara_client import MockCamaraClient, build_camara_client
 from aia.clients.storage import InMemoryTelemetryStore
 from aia.clients.topology import build_default_demo_topology
-from aia.config import LLM_BASE_URL, LLM_MODEL
-from aia.models import CongestionLevel, NetworkMetadata, ReachabilityStatus, Reading, StreamingBatch, TelemetryWindow
+from aia.config import LLM_MODEL
+from aia.models import (
+    CongestionLevel,
+    NetworkMetadata,
+    ReachabilityStatus,
+    Reading,
+    StreamingBatch,
+    TelemetryWindow,
+)
 from aia.nodes.detection import BaselineStats, BaselineStore
 from aia.pipeline import AnomalyInvestigationAgent
 
@@ -74,9 +82,24 @@ def build_seeded_baselines() -> BaselineStore:
     return store
 
 
-def build_demo_camara_client() -> MockCamaraClient:
+def setup_camara_client():
+    """
+    Connects to the real Nokia Network-as-Code / CAMARA API if RAPIDAPI_KEY is present.
+    Falls back to MockCamaraClient when offline or during dry runs.
+    """
+    rapidapi_key = os.environ.get("RAPIDAPI_KEY") or os.environ.get("CAMARA_API_KEY")
+    
+    if rapidapi_key:
+        logging.getLogger("aia").info("Connecting to real Nokia CAMARA API via RapidAPI...")
+        return build_camara_client()
+    
+    logging.getLogger("aia").warning("RAPIDAPI_KEY not found in environment; using MockCamaraClient.")
     return MockCamaraClient(overrides={
         "cluster-desert-042": {
+            "reachability": ReachabilityStatus.REACHABLE,
+            "congestion": CongestionLevel.LOW,
+        },
+        "cluster-desert-043": {
             "reachability": ReachabilityStatus.REACHABLE,
             "congestion": CongestionLevel.LOW,
         },
@@ -87,36 +110,26 @@ def build_demo_camara_client() -> MockCamaraClient:
     })
 
 
-def build_llm_client():
-    api_key = os.environ.get("MISTRAL_API_KEY")
-    if not api_key:
-        logging.getLogger("aia").warning("MISTRAL_API_KEY not found; falling back to deterministic narrator.")
-        return None
-        
-    return api_key
-
-
 def main() -> None:
-    llm_client = build_llm_client()
-
-    # Load the pre-trained Random Forest leak detector
+    # Load ML Model
     try:
         from ml_model.inference import LeakDetector
         leak_detector = LeakDetector()
-    except FileNotFoundError:
+    except Exception as e:
         logging.getLogger("aia").warning(
-            "No trained model found. Run `python -m ml_model.train` first. "
-            "Falling back to Z-score/sharp-deviation detection only."
+            f"Could not load ML model ({e}). Falling back to statistical detection."
         )
         leak_detector = None
+
+    camara_client = setup_camara_client()
 
     agent = AnomalyInvestigationAgent(
         baseline_store=build_seeded_baselines(),
         topology=build_default_demo_topology(),
         telemetry_store=InMemoryTelemetryStore(),
-        camara_client=build_demo_camara_client(),
+        camara_client=camara_client,
         leak_detector=leak_detector,
-        llm_client=llm_client,
+        llm_client=os.environ.get("MISTRAL_API_KEY"),
         llm_model=LLM_MODEL,
     )
 

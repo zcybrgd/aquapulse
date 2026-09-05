@@ -37,7 +37,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 # Nokia Network-as-Code RapidAPI host.
 #
 # This is the host used by the official Nokia Network-as-Code Python SDK.
-RAPIDAPI_HOST = "network-as-code.nokia.rapidapi.com"
+RAPIDAPI_HOST = os.environ.get("RAPIDAPI_HOST")
 
 
 # API key used to authenticate with Nokia Network-as-Code.
