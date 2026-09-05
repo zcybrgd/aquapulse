@@ -183,8 +183,8 @@ def compute_confidence_score(state: ClusterInvestigationState) -> float:
     window_len = len(state.window.readings)
     c_telemetry = min(1.0, window_len / EXPECTED_TELEMETRY_WINDOW_LEN)
 
-    # Granular CAMARA scoring: give partial credit when only one API failed.
-    if state.reachability_api_unavailable and state.congestion_api_unavailable:
+    # Check api_unavailable or specific API failure flags first
+    if state.api_unavailable or (state.reachability_api_unavailable and state.congestion_api_unavailable):
         c_camara = 0.0  # Total API failure
     elif state.reachability_api_unavailable or state.congestion_api_unavailable:
         c_camara = 0.5  # One API responded, one failed

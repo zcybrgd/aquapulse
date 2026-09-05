@@ -235,16 +235,11 @@ def _apply_insufficient_data(
     """
     Apply the Stage 2 insufficient-data classification.
 
-    Section 5.B.3-4:
-
-        On CAMARA/API failure, never infer a physical classification.
-
-    Requeue/escalation decisions and cross-batch cycle counting remain
-    the responsibility of RetryTracker in pipeline.py, which is the
-    single source of truth for retry handling.
+    On CAMARA/API failure, never infer a physical classification.
+    Mark the state for requeue so the pipeline can track retry cycles.
     """
-
     state.classification = Classification.INSUFFICIENT_DATA
+    state.requeue = True
 
 
 def check_platform_wide_outage(
