@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from aia.detection import detect
 from tests.conftest import make_window
 
+from aia.nodes.detection import detect
 
 def test_healthy_window_not_suspicious(baseline_store):
     window = make_window("cluster-a", [(45.0, 80.0, 40.0)] * 5)
