@@ -238,6 +238,7 @@ def _apply_insufficient_data(
     On CAMARA/API failure, never infer a physical classification.
     Mark the state for requeue so the pipeline can track retry cycles.
     """
+
     state.classification = Classification.INSUFFICIENT_DATA
     state.requeue = True
 
