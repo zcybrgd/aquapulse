@@ -1,13 +1,3 @@
-"""
-Stage 3: Deterministic Risk Assessment & Severity Tiering -- Section 5.C/5.D.
-
-All math lives here in pure Python/NumPy -- the LLM never touches these
-calculations (Section 6, "Strict LLM Boundary").
-
-Supports zone-specific threshold profiles: each geographic zone can override
-the default tier thresholds defined in config.py. Pipe diameter is factored
-into the risk assessment for volume-loss estimation.
-"""
 from __future__ import annotations
 
 import math
