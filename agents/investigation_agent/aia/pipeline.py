@@ -53,7 +53,11 @@ class AnomalyInvestigationAgent:
         llm_client=None,
         llm_model: str = "anthropic/claude-3.5-sonnet",
         retry_tracker: RetryTracker | None = None,
-        max_workers: int = 4,
+        # Sequential by default: parallel clusters each fire a Stage 4 Mistral
+        # call, and the free/dev Mistral tier's rate limit is low enough that
+        # even 2 concurrent narration calls can trigger a 429. Raise this only
+        # if your Mistral tier's RPS budget can absorb concurrent narration.
+        max_workers: int = 1,
     ):
         from aia.graph.builder import build_investigation_graph
 

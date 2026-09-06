@@ -8,3 +8,5 @@ uvicorn
 network_as_code
 twilio
 langchain-groq
+python-dotenv
+mistralai

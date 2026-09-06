@@ -255,16 +255,15 @@ EXPECTED_TELEMETRY_WINDOW_LEN = 10
 
 
 # ===========================================================================
-# Stage 4: AI Narration (Mistral API)
+# Stage 4: AI Narration (Groq API -- OpenAI-compatible)
 # ===========================================================================
 
-# Official Mistral API endpoint.
-LLM_BASE_URL = "https://api.mistral.ai/v1/chat/completions"
+# Groq's OpenAI-compatible endpoint.
+LLM_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Model used for AI narration.
-LLM_MODEL = "mistral-small-latest"
-
-LLM_MAX_TOKENS = 400
+# Model used for AI narration. Groq free tier: ~30 req/min, 1000 req/day
+# for chat models (verify current limits on console.groq.com/docs/rate-limits).
+LLM_MODEL = "openai/gpt-oss-20b"
 
 
 # ---------------------------------------------------------------------------

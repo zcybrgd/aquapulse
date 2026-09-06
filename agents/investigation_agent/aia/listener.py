@@ -91,7 +91,7 @@ def initialize_agent() -> tuple[AnomalyInvestigationAgent, BaselineStore]:
         telemetry_store=InMemoryTelemetryStore(),
         camara_client=camara_client,
         leak_detector=leak_detector,
-        llm_client=os.environ.get("MISTRAL_API_KEY"),
+        llm_client=os.environ.get("GROQ_API_KEY"),
         llm_model=LLM_MODEL,
     )
 
