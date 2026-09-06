@@ -1,11 +1,4 @@
-"""
-Pydantic v2 models for the Anomaly Investigation Agent.
 
-Covers:
-  - Section 3: Streaming Batch Input Schema
-  - Section 7: Structured Output Payload Schema
-  - Internal per-cluster investigation state threaded through the LangGraph graph
-"""
 from __future__ import annotations
 
 import re
@@ -105,6 +98,7 @@ class PhysicalDeviations(BaseModel):
     pressure_slope: float = 0.0
     flow_slope: float = 0.0
     is_stale_pre_outage_data: bool = False
+    estimated_volume_loss_lpm: Optional[float] = None
 
 
 # criticality selon : la proximite au reservoir et aussi le nombre de gens servis
