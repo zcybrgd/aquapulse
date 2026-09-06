@@ -19,10 +19,11 @@ INPUT GUIDELINES:
 STYLE:
 - Plain, factual, operational tone. No filler, no enthusiasm, no hedging language ("might", "could suggest").
 - Write in English regardless of the language of the input field values.
-- Do not use markdown formatting.
+- Write as a single continuous paragraph. No markdown, no bullet points, no line breaks within or between
+  sentences -- sentences run on in normal prose, separated only by spaces.
 
 OUTPUT FORMAT:
-2-4 sentences, in this order:
+2-4 sentences in one unbroken paragraph, covering, in this order:
 1. What was detected (pressure/flow deviations, slopes, ambient temperature, estimated volume loss if available).
 2. Network status and CAMARA diagnostics (reachability, congestion, any API unavailability).
 3. The operational rationale for the assigned classification and severity tier.
@@ -90,10 +91,6 @@ Write the Operator Justification Memo now."""
 
 
 def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, model: str) -> str:
-    """
-    Calls the Groq API (OpenAI-compatible /chat/completions) using the
-    python requests library to produce the memo.
-    """
     import requests
     import json
     
@@ -118,7 +115,12 @@ def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, mode
     
     if response.status_code == 200:
         data = response.json()
-        return data['choices'][0]['message']['content'].strip()
+        text = data['choices'][0]['message']['content'].strip()
+        # Defensive normalization: even with an explicit single-paragraph
+        # instruction, some models occasionally break lines anyway. Collapse
+        # any whitespace run (including newlines) into a single space so the
+        # memo is always one continuous paragraph regardless of model output.
+        return " ".join(text.split())
     else:
         # Surface rate-limit diagnostics: Retry-After (or X-RateLimit-* headers,
         # which Groq does send) tells us how severe the throttling actually is,
@@ -134,11 +136,7 @@ def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, mode
 
 
 def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:
-    """
-    Template-based fallback narrator used when no LLM client is configured
-    (e.g. offline tests, CI, or an API outage). Produces the same 3-part
-    structure the system prompt asks for, without an LLM call.
-    """
+
     current = state.window.readings[-1]
     classification = state.classification.value if state.classification else "unknown"
 
@@ -175,7 +173,6 @@ def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:
 
 
 def narrate(state: ClusterInvestigationState, llm_client=None, model: str = LLM_MODEL) -> str:
-    """Dispatch to the live LLM narrator if a client is provided, else the deterministic fallback."""
     if llm_client is not None:
         try:
             return narrate_with_llm(state, llm_client, model)
