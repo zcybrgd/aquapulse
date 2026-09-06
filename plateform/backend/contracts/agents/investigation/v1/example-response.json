@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "run_id": "AGRUN-000001",
+  "data_mode": "simulated",
+  "batch": {
+    "batch_id": "batch-2026-08-31-001",
+    "analysis_timestamp": "2026-08-31T02:00:00Z",
+    "total_clusters_analyzed": 1,
+    "anomalies_detected_count": 1,
+    "investigated_threats": [
+      {
+        "anomaly_id": "e048d424-6a15-47ed-a35c-b3cc4c5ff445",
+        "sensor_cluster_id": "cluster-desert-042",
+        "segment_id": "seg-neom-north-01",
+        "classification": "confirmed_anomaly",
+        "severity_tier": 3,
+        "network_status": {
+          "camara_reachability_status": "REACHABLE",
+          "camara_congestion_level": "LOW",
+          "api_unavailable": false
+        },
+        "physical_deviations": {
+          "pressure_drop_pct": 36.6071,
+          "flow_surge_pct": 40.2743,
+          "pressure_slope": -1.9033,
+          "flow_slope": 3.9317,
+          "is_stale_pre_outage_data": false
+        },
+        "criticality_metrics": {
+          "criticality_score": 3,
+          "proximity_to_reservoir_m": 120.0,
+          "population_served": 45000,
+          "associated_valve_id": "valve-neom-north-01",
+          "pipe_diameter_mm": 400.0
+        },
+        "operator_justification": "Operator justification text",
+        "confidence_score": 0.9078
+      }
+    ]
+  }
+}

@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy: #0b2436;
+  --teal: #08a6a6;
+  --aqua: #2dd4bf;
+  --aqua-light: #e8f8f7;
+  --page: #f6f9fa;
+  --white: #ffffff;
+  --ink: #142b38;
+  --ink-muted: #647780;
+  --warning: #f59e0b;
+  --critical: #e5484d;
+  --success: #22a06b;
+  --border: #e3ecef;
+  --radius-card: 16px;
+  --sidebar-width: 256px;
+  --topbar-height: 64px;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--page);
+  color: var(--ink);
+  font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  overflow-x: hidden;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--aqua-light);
+    color: var(--ink);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-line bg-white shadow-card;
+  }
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  font-family: inherit;
+  background: #e8f8f7;
+  z-index: 0;
+}
+
+.ap-divicon {
+  background: transparent;
+  border: none;
+}
+
+.ap-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.ap-marker.circle {
+  border-radius: 999px;
+  background: var(--marker);
+}
+
+.ap-marker.diamond {
+  width: 16px;
+  height: 16px;
+  transform: rotate(45deg);
+  background: var(--marker);
+}
+
+.ap-marker.diamond .ap-marker-label {
+  transform: rotate(-45deg);
+}
+
+.ap-marker.hex {
+  background: var(--marker);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.ap-marker.incident {
+  border-radius: 6px;
+  background: var(--marker);
+}
+
+.ap-marker.detection {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--marker);
+  transform: rotate(0deg);
+}
+
+.ap-marker.incident-pulse {
+  position: relative;
+}
+
+.ap-marker.incident-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--marker);
+  border-radius: 8px;
+  animation: incident-pulse 1.2s ease-out 1;
+}
+
+@keyframes incident-pulse {
+  from {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .ap-marker.incident-pulse::after {
+    animation: none;
+  }
+}

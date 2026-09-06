@@ -1,0 +1,302 @@
+{
+  "$defs": {
+    "CriticalityMetricsV1": {
+      "additionalProperties": true,
+      "properties": {
+        "criticality_score": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Criticality Score"
+        },
+        "proximity_to_reservoir_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proximity To Reservoir M"
+        },
+        "population_served": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Population Served"
+        },
+        "associated_valve_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Associated Valve Id"
+        },
+        "pipe_diameter_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pipe Diameter Mm"
+        }
+      },
+      "title": "CriticalityMetricsV1",
+      "type": "object"
+    },
+    "InvestigatedThreatV1": {
+      "additionalProperties": true,
+      "description": "Friend Investigation Agent finding. `confirmed_*` is an agent assessment, not human confirmation.",
+      "properties": {
+        "anomaly_id": {
+          "title": "Anomaly Id",
+          "type": "string"
+        },
+        "sensor_cluster_id": {
+          "title": "Sensor Cluster Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "confirmed_anomaly",
+            "confirmed_instrument_fault"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "severity_tier": {
+          "title": "Severity Tier",
+          "type": "integer"
+        },
+        "network_status": {
+          "$ref": "#/$defs/NetworkStatusV1"
+        },
+        "physical_deviations": {
+          "$ref": "#/$defs/PhysicalDeviationsV1"
+        },
+        "criticality_metrics": {
+          "$ref": "#/$defs/CriticalityMetricsV1"
+        },
+        "operator_justification": {
+          "title": "Operator Justification",
+          "type": "string"
+        },
+        "confidence_score": {
+          "title": "Confidence Score",
+          "type": "number"
+        },
+        "extensions": {
+          "title": "Extensions",
+          "type": "object"
+        }
+      },
+      "required": [
+        "anomaly_id",
+        "sensor_cluster_id",
+        "segment_id",
+        "classification",
+        "severity_tier",
+        "network_status",
+        "physical_deviations",
+        "criticality_metrics",
+        "operator_justification",
+        "confidence_score"
+      ],
+      "title": "InvestigatedThreatV1",
+      "type": "object"
+    },
+    "InvestigationBatchResultV1": {
+      "additionalProperties": true,
+      "properties": {
+        "batch_id": {
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "analysis_timestamp": {
+          "format": "date-time",
+          "title": "Analysis Timestamp",
+          "type": "string"
+        },
+        "total_clusters_analyzed": {
+          "title": "Total Clusters Analyzed",
+          "type": "integer"
+        },
+        "anomalies_detected_count": {
+          "title": "Anomalies Detected Count",
+          "type": "integer"
+        },
+        "investigated_threats": {
+          "items": {
+            "$ref": "#/$defs/InvestigatedThreatV1"
+          },
+          "title": "Investigated Threats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "batch_id",
+        "analysis_timestamp",
+        "total_clusters_analyzed",
+        "anomalies_detected_count",
+        "investigated_threats"
+      ],
+      "title": "InvestigationBatchResultV1",
+      "type": "object"
+    },
+    "NetworkStatusV1": {
+      "additionalProperties": true,
+      "properties": {
+        "camara_reachability_status": {
+          "title": "Camara Reachability Status",
+          "type": "string"
+        },
+        "camara_congestion_level": {
+          "title": "Camara Congestion Level",
+          "type": "string"
+        },
+        "api_unavailable": {
+          "title": "Api Unavailable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "camara_reachability_status",
+        "camara_congestion_level",
+        "api_unavailable"
+      ],
+      "title": "NetworkStatusV1",
+      "type": "object"
+    },
+    "PhysicalDeviationsV1": {
+      "additionalProperties": true,
+      "properties": {
+        "pressure_drop_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressure Drop Pct"
+        },
+        "flow_surge_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Surge Pct"
+        },
+        "pressure_slope": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pressure Slope"
+        },
+        "flow_slope": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flow Slope"
+        },
+        "is_stale_pre_outage_data": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Stale Pre Outage Data"
+        }
+      },
+      "title": "PhysicalDeviationsV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "data_mode": {
+      "default": "simulated",
+      "title": "Data Mode",
+      "type": "string"
+    },
+    "batch": {
+      "$ref": "#/$defs/InvestigationBatchResultV1"
+    },
+    "extensions": {
+      "title": "Extensions",
+      "type": "object"
+    }
+  },
+  "required": [
+    "batch"
+  ],
+  "title": "InvestigationResponseV1",
+  "type": "object"
+}

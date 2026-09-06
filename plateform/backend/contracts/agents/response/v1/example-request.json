@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "run_id": "AGRUN-000002",
+  "requested_at": "2026-09-01T07:45:00Z",
+  "data_mode": "simulated",
+  "incident_id": "INC-1835",
+  "cluster_id": "AP-CLUSTER-DET-000001",
+  "device_id": "VLV-HBR-007",
+  "severity_tier": 2,
+  "network_grant": {"granted": false, "data_mode": "mock"},
+  "network_denied": {"denied": true, "reason": "camara_disabled", "data_mode": "mock"},
+  "operator_contact": {"display_name": "Demo Operator", "channel": "unconfigured"}
+}

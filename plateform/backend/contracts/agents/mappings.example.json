@@ -1,0 +1,11 @@
+[
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-example-001",
+    "internal_entity_type": "detection",
+    "internal_public_id": "DET-000001",
+    "enabled": true,
+    "metadata": {"note": "Example only. Do not guess NEOM demo IDs."}
+  }
+]

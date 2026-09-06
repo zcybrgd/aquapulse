@@ -1,0 +1,14 @@
+{
+  "schema_version": "2.0",
+  "result_id": "res-invalid",
+  "incident_id": "INC-1835",
+  "cluster_id": "cluster-desert-042",
+  "device_id": "valve-neom-north-01",
+  "severity_tier": 9,
+  "reachability": {},
+  "decision": "EXPLODE",
+  "notification_sent": false,
+  "valve_command_sent": false,
+  "valve_command_confirmed": false,
+  "created_at": "2026-09-01T07:45:00Z"
+}

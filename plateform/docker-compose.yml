@@ -1,0 +1,48 @@
+# Local PostgreSQL 16 with TimescaleDB and PostGIS for AquaPulse development.
+#
+# Image: timescale/timescaledb-ha:pg16
+# Confirmed to ship PostgreSQL 16 together with TimescaleDB and PostGIS.
+# The previous image was postgis/postgis:16-3.4. Both are PostgreSQL 16, so the
+# existing aquapulse_pgdata volume can be reused.
+#
+# Safe upgrade (do NOT use `docker compose down -v`):
+#   1. Back up: docker exec aquapulse-db pg_dump -U aquapulse -Fc aquapulse > aquapulse.dump
+#   2. docker compose up -d --force-recreate aquapulse-db
+#   3. Confirm counts of incidents, assets and geometries are unchanged
+#   4. alembic upgrade head && python -m app.scripts.seed_database
+#
+# The HA image stores PGDATA at /home/postgres/pgdata/data. The named volume is
+# remounted at that path so existing cluster files stay in place.
+# If the container fails with a permission error, fix ownership of the volume
+# without deleting it, for example:
+#   docker run --rm -v aquapulse_aquapulse_pgdata:/data alpine chown -R 1000:1000 /data
+# Postgres must also preload TimescaleDB (`command` below). Existing PostGIS
+# clusters do not set that automatically.
+#
+# Development credentials below are defaults only. Change them before production.
+services:
+  aquapulse-db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: aquapulse-db
+    # Host port defaults to 5432. Override POSTGRES_PORT if that port is already taken.
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aquapulse}
+      POSTGRES_USER: ${POSTGRES_USER:-aquapulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aquapulse}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+      TIMESCALEDB_TELEMETRY: "off"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - aquapulse_pgdata:/home/postgres/pgdata/data
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  aquapulse_pgdata:

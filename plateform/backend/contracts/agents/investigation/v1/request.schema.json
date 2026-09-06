@@ -1,0 +1,261 @@
+{
+  "$defs": {
+    "InvestigationBatchRequestV1": {
+      "properties": {
+        "batch_id": {
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "analysis_timestamp": {
+          "format": "date-time",
+          "title": "Analysis Timestamp",
+          "type": "string"
+        },
+        "clusters": {
+          "items": {
+            "$ref": "#/$defs/InvestigationClusterV1"
+          },
+          "title": "Clusters",
+          "type": "array"
+        }
+      },
+      "required": [
+        "batch_id",
+        "analysis_timestamp"
+      ],
+      "title": "InvestigationBatchRequestV1",
+      "type": "object"
+    },
+    "InvestigationClusterV1": {
+      "additionalProperties": false,
+      "description": "Documented fields sent to the Investigation Agent. Missing values stay null.",
+      "properties": {
+        "cluster_id": {
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "external_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "External Aliases",
+          "type": "array"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment Id"
+        },
+        "sensor_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sensor Ids",
+          "type": "array"
+        },
+        "telemetry_window": {
+          "additionalProperties": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "title": "Telemetry Window",
+          "type": "object"
+        },
+        "pressure": {
+          "$ref": "#/$defs/OptionalMetric"
+        },
+        "flow": {
+          "$ref": "#/$defs/OptionalMetric"
+        },
+        "data_freshness": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Freshness"
+        },
+        "network_context": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network Context"
+        },
+        "temperature": {
+          "$ref": "#/$defs/OptionalMetric"
+        },
+        "criticality": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Criticality"
+        },
+        "population_served": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Population Served"
+        },
+        "associated_valve_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Associated Valve Id"
+        },
+        "pipe_diameter_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pipe Diameter Mm"
+        },
+        "pipe_diameter_available": {
+          "default": false,
+          "title": "Pipe Diameter Available",
+          "type": "boolean"
+        },
+        "population_available": {
+          "default": false,
+          "title": "Population Available",
+          "type": "boolean"
+        },
+        "data_mode": {
+          "default": "simulated",
+          "title": "Data Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cluster_id",
+        "telemetry_window",
+        "pressure",
+        "flow",
+        "temperature"
+      ],
+      "title": "InvestigationClusterV1",
+      "type": "object"
+    },
+    "OptionalMetric": {
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Values"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "available": {
+          "default": false,
+          "title": "Available",
+          "type": "boolean"
+        }
+      },
+      "title": "OptionalMetric",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "data_mode": {
+      "default": "simulated",
+      "title": "Data Mode",
+      "type": "string"
+    },
+    "batch": {
+      "$ref": "#/$defs/InvestigationBatchRequestV1"
+    }
+  },
+  "required": [
+    "run_id",
+    "requested_at",
+    "batch"
+  ],
+  "title": "InvestigationRequestV1",
+  "type": "object"
+}

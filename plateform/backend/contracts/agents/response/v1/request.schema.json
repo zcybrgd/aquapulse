@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "NetworkDeniedV1": {
+      "additionalProperties": true,
+      "properties": {
+        "denied": {
+          "default": true,
+          "title": "Denied",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "data_mode": {
+          "default": "mock",
+          "title": "Data Mode",
+          "type": "string"
+        }
+      },
+      "title": "NetworkDeniedV1",
+      "type": "object"
+    },
+    "NetworkGrantV1": {
+      "additionalProperties": true,
+      "properties": {
+        "granted": {
+          "default": false,
+          "title": "Granted",
+          "type": "boolean"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "grant_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grant Id"
+        },
+        "data_mode": {
+          "default": "mock",
+          "title": "Data Mode",
+          "type": "string"
+        }
+      },
+      "title": "NetworkGrantV1",
+      "type": "object"
+    },
+    "OperatorContactV1": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "default": "Demo Operator",
+          "title": "Display Name",
+          "type": "string"
+        },
+        "channel": {
+          "default": "unconfigured",
+          "title": "Channel",
+          "type": "string"
+        }
+      },
+      "title": "OperatorContactV1",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "title": "Requested At",
+      "type": "string"
+    },
+    "data_mode": {
+      "default": "simulated",
+      "title": "Data Mode",
+      "type": "string"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "cluster_id": {
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "device_id": {
+      "title": "Device Id",
+      "type": "string"
+    },
+    "severity_tier": {
+      "title": "Severity Tier",
+      "type": "integer"
+    },
+    "network_grant": {
+      "$ref": "#/$defs/NetworkGrantV1"
+    },
+    "network_denied": {
+      "$ref": "#/$defs/NetworkDeniedV1"
+    },
+    "operator_contact": {
+      "$ref": "#/$defs/OperatorContactV1"
+    }
+  },
+  "required": [
+    "run_id",
+    "requested_at",
+    "incident_id",
+    "cluster_id",
+    "device_id",
+    "severity_tier",
+    "network_grant",
+    "network_denied",
+    "operator_contact"
+  ],
+  "title": "ResponseRequestV1",
+  "type": "object"
+}

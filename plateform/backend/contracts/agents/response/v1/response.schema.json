@@ -1,0 +1,194 @@
+{
+  "$defs": {
+    "ResponseAuditEntryV1": {
+      "additionalProperties": true,
+      "properties": {
+        "entry_id": {
+          "title": "Entry Id",
+          "type": "string"
+        },
+        "incident_id": {
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "cluster_id": {
+          "title": "Cluster Id",
+          "type": "string"
+        },
+        "severity_tier": {
+          "title": "Severity Tier",
+          "type": "integer"
+        },
+        "network_grant": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network Grant"
+        },
+        "network_denied": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network Denied"
+        },
+        "actuation_result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actuation Result"
+        },
+        "logged_at": {
+          "format": "date-time",
+          "title": "Logged At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry_id",
+        "incident_id",
+        "cluster_id",
+        "severity_tier",
+        "logged_at"
+      ],
+      "title": "ResponseAuditEntryV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Recommendation only. AquaPulse never treats this as authorization to actuate.",
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "result_id": {
+      "title": "Result Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "cluster_id": {
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "device_id": {
+      "title": "Device Id",
+      "type": "string"
+    },
+    "severity_tier": {
+      "title": "Severity Tier",
+      "type": "integer"
+    },
+    "reachability": {
+      "title": "Reachability",
+      "type": "object"
+    },
+    "decision": {
+      "enum": [
+        "LOG_ONLY",
+        "ALERT_AND_AWAIT",
+        "AUTONOMOUS_ISOLATE",
+        "ESCALATE_UNREACHABLE"
+      ],
+      "title": "Decision",
+      "type": "string"
+    },
+    "notification_sent": {
+      "default": false,
+      "title": "Notification Sent",
+      "type": "boolean"
+    },
+    "valve_command_sent": {
+      "default": false,
+      "title": "Valve Command Sent",
+      "type": "boolean"
+    },
+    "valve_command_confirmed": {
+      "default": false,
+      "title": "Valve Command Confirmed",
+      "type": "boolean"
+    },
+    "human_override_requested": {
+      "default": false,
+      "title": "Human Override Requested",
+      "type": "boolean"
+    },
+    "human_override_response": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Human Override Response"
+    },
+    "reasoning_trace": {
+      "anyOf": [
+        {
+          "items": {},
+          "type": "array"
+        },
+        {
+          "type": "object"
+        }
+      ],
+      "title": "Reasoning Trace"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "audit": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResponseAuditEntryV1"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "extensions": {
+      "title": "Extensions",
+      "type": "object"
+    }
+  },
+  "required": [
+    "result_id",
+    "incident_id",
+    "cluster_id",
+    "device_id",
+    "severity_tier",
+    "decision",
+    "created_at"
+  ],
+  "title": "ResponseResultV1",
+  "type": "object"
+}

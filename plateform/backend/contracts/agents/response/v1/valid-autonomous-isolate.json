@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "result_id": "res-isolate-001",
+  "incident_id": "INC-1835",
+  "cluster_id": "cluster-desert-042",
+  "device_id": "valve-neom-north-01",
+  "severity_tier": 3,
+  "reachability": {"status": "REACHABLE"},
+  "decision": "AUTONOMOUS_ISOLATE",
+  "notification_sent": false,
+  "valve_command_sent": true,
+  "valve_command_confirmed": true,
+  "human_override_requested": false,
+  "human_override_response": null,
+  "reasoning_trace": [{"step": "execute_response", "note": "Agent reported isolation. AquaPulse must not trust this."}],
+  "created_at": "2026-09-01T07:45:00Z"
+}

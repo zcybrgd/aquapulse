@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "result_id": "res-escalate-001",
+  "incident_id": "INC-1835",
+  "cluster_id": "cluster-desert-042",
+  "device_id": "valve-neom-north-01",
+  "severity_tier": 2,
+  "reachability": {"status": "UNREACHABLE", "api_unavailable": false},
+  "decision": "ESCALATE_UNREACHABLE",
+  "notification_sent": false,
+  "valve_command_sent": false,
+  "valve_command_confirmed": false,
+  "human_override_requested": true,
+  "human_override_response": null,
+  "reasoning_trace": [{"step": "reachability_check", "status": "UNREACHABLE"}],
+  "created_at": "2026-09-01T07:45:00Z"
+}

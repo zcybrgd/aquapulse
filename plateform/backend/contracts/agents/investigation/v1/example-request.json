@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "run_id": "AGRUN-000001",
+  "requested_at": "2026-09-01T07:45:00Z",
+  "data_mode": "simulated",
+  "batch": {
+    "batch_id": "AP-BATCH-000001",
+    "analysis_timestamp": "2026-09-01T07:45:00Z",
+    "clusters": [
+      {
+        "cluster_id": "AP-CLUSTER-DET-000001",
+        "external_aliases": [],
+        "segment_id": "HBR-XFER-7",
+        "sensor_ids": ["SNS-HBR-007"],
+        "telemetry_window": {
+          "start": "2026-09-01T06:45:00Z",
+          "end": "2026-09-01T07:45:00Z"
+        },
+        "pressure": {"value": null, "values": null, "unit": "kPa", "available": false},
+        "flow": {"value": null, "values": null, "unit": "L/s", "available": false},
+        "data_freshness": "fresh",
+        "network_context": {"zone": "Dubai Harbour"},
+        "temperature": {"value": null, "values": null, "unit": "°C", "available": false},
+        "criticality": 3,
+        "population_served": null,
+        "associated_valve_id": null,
+        "pipe_diameter_mm": null,
+        "pipe_diameter_available": false,
+        "population_available": false,
+        "data_mode": "simulated"
+      }
+    ]
+  }
+}

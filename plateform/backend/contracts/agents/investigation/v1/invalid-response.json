@@ -1,0 +1,24 @@
+{
+  "batch_id": "batch-invalid",
+  "analysis_timestamp": "2026-08-31T02:00:00Z",
+  "total_clusters_analyzed": 3,
+  "anomalies_detected_count": 3,
+  "investigated_threats": [
+    {
+      "anomaly_id": "e048d424-6a15-47ed-a35c-b3cc4c5ff445",
+      "sensor_cluster_id": "cluster-desert-042",
+      "segment_id": "seg-neom-north-01",
+      "classification": "confirmed_anomaly",
+      "severity_tier": 9,
+      "network_status": {
+        "camara_reachability_status": "REACHABLE",
+        "camara_congestion_level": "LOW",
+        "api_unavailable": false
+      },
+      "physical_deviations": {},
+      "criticality_metrics": {},
+      "operator_justification": "Invalid severity and count mismatch.",
+      "confidence_score": 1.5
+    }
+  ]
+}
