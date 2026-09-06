@@ -104,7 +104,7 @@ async def _publish_state() -> None:
         await _redis.publish("sim:state", json.dumps(payload))
     except Exception:
         logger.exception("Failed to publish sim state to redis")
-        
+
 
 async def _publish_raw_logs() -> None:
     """
@@ -122,23 +122,17 @@ async def _publish_raw_logs() -> None:
         logger.exception("Failed to publish raw logs to redis")
 
 
+
 async def _dispatch_batch() -> None:
-    batch = build_batch(state)
-    if not batch["telemetry_windows"]:
-        return
-    if _redis is not None:
-        try:
-            await _redis.publish("sim:telemetry", json.dumps(batch))
-        except Exception:
-            logger.exception("Failed to publish telemetry batch to redis")
-    if _http_client is None:
+    """Builds and publishes telemetry batches to Redis for local AIA agent processing."""
+    if _redis is None:
         return
     try:
-        resp = await _http_client.post(f"{config.AIA_SERVICE_URL}/batches", json=batch)
-        if resp.status_code >= 400:
-            logger.warning("aia-service rejected batch %s: %s", batch["batch_id"], resp.text[:300])
+        batch = build_batch(state)
+        payload = batch.model_dump(mode="json") if hasattr(batch, "model_dump") else batch
+        await _redis.publish("sim:telemetry", json.dumps(payload))
     except Exception:
-        logger.exception("Failed to dispatch batch to aia-service")
+        logger.exception("Failed to dispatch telemetry batch to redis")
 
 
 # ---------------------------------------------------------------------------

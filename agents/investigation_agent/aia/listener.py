@@ -61,6 +61,7 @@ def auto_seed_missing_baselines(batch: StreamingBatch, baseline_store: BaselineS
             logger.info("Auto-seeded baseline for %s: P_mean=%.1f (std=%.2f), Q_mean=%.1f (std=%.2f)", cid, mean_p, std_p, mean_q, std_q)
 
 
+            
 def setup_camara_client():
     rapidapi_key = os.environ.get("RAPIDAPI_KEY") or os.environ.get("CAMARA_API_KEY")
     if rapidapi_key:
