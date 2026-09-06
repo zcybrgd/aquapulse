@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -172,6 +171,7 @@ class AnomalyInvestigationAgent:
                 pressure_slope=state.pressure_slope,
                 flow_slope=state.flow_slope,
                 is_stale_pre_outage_data=state.is_stale_pre_outage_data,
+                estimated_volume_loss_lpm=state.estimated_volume_loss_lpm,
             ),
             criticality_metrics=CriticalityMetrics(
                 criticality_score=state.criticality_score or 1,
