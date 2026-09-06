@@ -57,7 +57,7 @@ class AnomalyInvestigationAgent:
         # call, and the free/dev Mistral tier's rate limit is low enough that
         # even 2 concurrent narration calls can trigger a 429. Raise this only
         # if your Mistral tier's RPS budget can absorb concurrent narration.
-        max_workers: int = 1,
+        max_workers: int = 4,
     ):
         from aia.graph.builder import build_investigation_graph
 

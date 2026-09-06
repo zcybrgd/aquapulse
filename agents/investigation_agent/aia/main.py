@@ -136,7 +136,7 @@ def main() -> None:
     batch = build_demo_batch()
     payload = agent.process_batch(batch)
 
-    print(json.dumps(payload.model_dump(mode="json"), indent=2))
+    print(json.dumps(payload.model_dump(mode="json"), indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
