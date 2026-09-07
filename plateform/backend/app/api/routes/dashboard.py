@@ -23,16 +23,16 @@ def get_dashboard_summary(
     online_sensors, total_sensors = assets.sensor_counts()
     network = telemetry.network_summary()
     network_health = network.average_packet_delivery_pct
-    if network_health is None:
-        network_health = 0.0
     return DashboardSummary(
         active_incidents=active,
         critical_incidents=critical,
         online_sensors=online_sensors,
         total_sensors=total_sensors,
-        network_health_percent=round(min(100.0, max(0.0, network_health)), 1),
-        estimated_water_loss_m3=water_loss,
-        average_response_time_min=11.4,
+        network_health_percent=(
+            round(min(100.0, max(0.0, network_health)), 1) if network_health is not None else None
+        ),
+        estimated_water_loss_m3=None,
+        average_response_time_min=None,
         awaiting_approval=awaiting,
         responding=responding,
         overdue_response_tasks=operations.overdue_task_count(),

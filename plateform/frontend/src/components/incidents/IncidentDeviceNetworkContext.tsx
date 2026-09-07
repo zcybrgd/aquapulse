@@ -61,7 +61,9 @@ export function IncidentDeviceNetworkContext({ incidentId }: IncidentDeviceNetwo
         remain incident workflow states.
       </p>
       {error ? <p className="mt-3 text-sm text-critical">{error}</p> : null}
-      {!context?.available ? (
+      {context && context.source_mode !== "nokia_live" && context.source_mode !== "nokia_simulator" ? (
+        <p className="mt-4 text-sm text-ink-muted">Network data source not connected</p>
+      ) : !context?.available ? (
         <p className="mt-4 text-sm text-ink-muted">No affected device is linked to this incident.</p>
       ) : (
         <div className="mt-4 space-y-3">

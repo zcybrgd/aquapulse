@@ -333,7 +333,7 @@ class IntegrationService:
 
     def get_run(self, run_id: str) -> AgentRunDetail:
         run = self.repository.get_run(run_id)
-        if run is None:
+        if run is None or run.data_mode == MOCK_DATA_MODE:
             raise AgentIntegrationError("Agent run not found.", code="agent_invalid_response", status_code=404)
         summary = self._to_run_summary(run)
         return AgentRunDetail(
@@ -710,8 +710,8 @@ class IntegrationService:
                     decision=parsed.decision,
                     reachability=parsed.reachability,
                     notification_sent=False,
-                    valve_command_sent=parsed.valve_command_sent,
-                    valve_command_confirmed=parsed.valve_command_confirmed,
+                    valve_command_sent=False,
+                    valve_command_confirmed=False,
                     human_override_requested=parsed.human_override_requested,
                     human_override_response=parsed.human_override_response,
                     reasoning_trace=parsed.reasoning_trace,

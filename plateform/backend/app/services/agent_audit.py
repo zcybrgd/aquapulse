@@ -7,7 +7,7 @@ from app.core.exceptions import AgentAuditEventNotFoundError, AgentAuditRunNotFo
 from app.data.incidents import SEED_NOW
 from app.db.models import AgentAuditEvent, AgentRun
 from app.integrations.sanitize import sanitize_payload
-from app.network.constants import NETWORK_AGENT_CODE, NETWORK_CONTRACT
+from app.network.constants import MOCK_DATA_MODE, NETWORK_AGENT_CODE, NETWORK_CONTRACT
 from app.repositories.agent_audit import AgentAuditRepository
 from app.schemas.agent_audit import (
     AgentAuditEventDetail,
@@ -192,7 +192,7 @@ class AgentAuditService:
 
     def get_run(self, run_id: str) -> AgentAuditRunDetail:
         run = self.repository.get_run(run_id)
-        if run is None:
+        if run is None or run.data_mode == MOCK_DATA_MODE:
             raise AgentAuditRunNotFoundError(run_id)
         events = self.repository.events_for_run(run.id)
         summary = self._to_run_summary(run, events)

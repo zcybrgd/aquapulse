@@ -364,7 +364,7 @@ def seed_database(session: Session | None = None) -> SeedSummary:
         )
         settings = dict(organization.settings or {})
         settings["demo"] = True
-        settings["seed_version"] = "step-12-agent-native"
+        settings["seed_version"] = "step-13-no-dummy-agents"
         organization.settings = settings
 
         zones: dict[str, Zone] = {}
@@ -489,9 +489,9 @@ def print_summary(summary: SeedSummary) -> None:
     print(f"  timeline events: {summary.timeline_events}")
     print(f"  maintenance plans: {summary.maintenance_plans}")
     print(f"  maintenance work orders: {summary.maintenance_work_orders}")
-    print(f"  mock agent runs: {summary.mock_agent_runs}")
+    print(f"  dummy agent runs: {summary.mock_agent_runs}")
     print(f"  investigation findings: {summary.investigation_findings}")
-    print(f"  network draft events: {summary.network_events}")
+    print(f"  network agent events: {summary.network_events}")
     print(f"  device network snapshots: {summary.device_network_snapshots}")
     print(f"  agent audit events: {summary.agent_audit_events}")
 

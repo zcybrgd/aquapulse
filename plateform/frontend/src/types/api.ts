@@ -12,9 +12,9 @@ export interface DashboardSummary {
   critical_incidents: number;
   online_sensors: number;
   total_sensors: number;
-  network_health_percent: number;
-  estimated_water_loss_m3: number;
-  average_response_time_min: number;
+  network_health_percent: number | null;
+  estimated_water_loss_m3: number | null;
+  average_response_time_min: number | null;
   awaiting_approval?: number;
   responding?: number;
   overdue_response_tasks?: number;

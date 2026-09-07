@@ -208,8 +208,8 @@ export function IntegrationsPage() {
               </div>
               {(data?.recommendations.length ?? 0) === 0 ? (
                 <EmptyState
-                  title="No Response Agent results yet"
-                  description="Recommendations appear here after the Response Agent POSTs to /api/integrations/agents/response/v1/results. Seeded mock recommendations are not shown."
+                  title="No Response Agent recommendation available"
+                  description="Waiting for integration. Recommendations appear after a validated Response Agent POST."
                 />
               ) : (
                 <ul className="divide-y divide-line">

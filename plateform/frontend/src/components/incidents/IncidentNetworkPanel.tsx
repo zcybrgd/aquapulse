@@ -21,10 +21,10 @@ export function IncidentNetworkPanel({ incident }: IncidentNetworkPanelProps) {
       <h3 className="text-base font-semibold text-ink">Network condition</h3>
       <p className="mt-0.5 text-sm text-ink-muted">{incident.network_condition}</p>
       <div className="mt-4 space-y-3">
-        <Row label="Device reachability" value={incident.device_reachability} />
+        <Row label="Device reachability" value="Unavailable" />
         <Row label="Signal strength" value={`${incident.signal_strength_dbm} dBm`} />
         <Row label="Packet loss" value={`${formatNumber(incident.packet_loss_percent, 1)}%`} />
-        <Row label="Network priority" value={incident.network_priority_status} />
+        <Row label="Network priority" value="Unavailable" />
       </div>
     </Card>
   );

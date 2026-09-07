@@ -25,9 +25,9 @@ class DashboardSummary(BaseModel):
     critical_incidents: int = Field(ge=0)
     online_sensors: int = Field(ge=0)
     total_sensors: int = Field(ge=0)
-    network_health_percent: float = Field(ge=0, le=100)
-    estimated_water_loss_m3: float = Field(ge=0)
-    average_response_time_min: float = Field(ge=0)
+    network_health_percent: float | None = None
+    estimated_water_loss_m3: float | None = None
+    average_response_time_min: float | None = None
     awaiting_approval: int = Field(ge=0, default=0)
     responding: int = Field(ge=0, default=0)
     overdue_response_tasks: int = Field(ge=0, default=0)

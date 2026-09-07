@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 
+import { ResponseAgentPanel } from "../components/integrations/ResponseAgentPanel";
 import { AssetDetailHeader } from "../components/assets/AssetDetailHeader";
 import { AssetHealthChart } from "../components/assets/AssetHealthChart";
 import { AssetLocationPanel } from "../components/assets/AssetLocationPanel";
@@ -11,12 +12,21 @@ import { AssetDetailSkeleton } from "../components/assets/AssetSkeletons";
 import { AssetTypePanel } from "../components/assets/AssetTypePanel";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
+import { useAgentRecommendations } from "../hooks/useAgentRecommendations";
 import { useAssetDetail } from "../hooks/useAssetDetail";
 
 export function AssetDetailPage() {
   const { assetId } = useParams();
   const location = useLocation();
   const { asset, health, range, setRange, loading, refreshing, notFound, error, backgroundError, lastRefreshAt, reload } = useAssetDetail(assetId);
+  const recommendations = useAgentRecommendations();
+  const assetRecommendations = recommendations.items.filter(
+    (item) =>
+      item.mapped_device_id === assetId ||
+      item.mapped_device_id === asset?.external_id ||
+      item.external_device_id === assetId ||
+      item.external_device_id === asset?.external_id,
+  );
   const reduceMotion = useReducedMotion();
 
   return (
@@ -65,6 +75,12 @@ export function AssetDetailPage() {
             </div>
             <div className="flex min-w-0 flex-col gap-4">
               <AssetLocationPanel asset={asset} />
+              <ResponseAgentPanel
+                items={assetRecommendations}
+                loading={recommendations.loading}
+                error={recommendations.error}
+                onRetry={recommendations.reload}
+              />
               <AssetMaintenancePanel asset={asset} />
               <AssetRelatedIncidents incidents={asset.related_incidents} />
             </div>

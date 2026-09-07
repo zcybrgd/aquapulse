@@ -9,7 +9,7 @@ from app.db.session import get_session_factory
 from app.integrations.contracts.investigation import InvestigationBatchResultV1, InvestigatedThreatV1
 from app.integrations.fixtures import INVESTIGATION_EXAMPLE_BATCH
 from app.integrations.sanitize import REDACTED, sanitize_payload
-from app.network.constants import MOCK_DATA_MODE, NETWORK_AGENT_CODE, NETWORK_CONTRACT
+from app.network.constants import NETWORK_AGENT_CODE, NETWORK_CONTRACT
 from app.scripts.seed_database import seed_database
 
 
@@ -96,13 +96,13 @@ def test_screening_priority_label_and_awaiting_investigation(client) -> None:
         items = client.get("/api/detections").json()["items"]
     assert items
     assert all(item["screening_priority_label"] == "Screening priority" for item in items)
-    open_items = [item for item in items if item["status"] in {"new", "queued"}]
+    open_items = [item for item in items if item["status"] in {"new", "queued"} and not item["has_agent_finding"]]
     assert open_items
     assert all(item["awaiting_agent_investigation"] is True for item in open_items)
-    assert all(item["has_agent_finding"] is False for item in items)
-    detail = client.get(f"/api/detections/{items[0]['id']}").json()
+    bare = next(item for item in items if not item["has_agent_finding"])
+    detail = client.get(f"/api/detections/{bare['id']}").json()
     assert detail["screening_priority_label"] == "Screening priority"
-    assert detail["priority"] == items[0]["priority"]
+    assert detail["priority"] == bare["priority"]
     assert detail["agent_finding"] is None
 
 
@@ -114,13 +114,8 @@ def test_network_draft_logs_and_unconfirmed_contract(client, test_database) -> N
     assert summary["cellular_devices"] >= 1
     assert "health score" not in summary["note"].lower()
     events = client.get("/api/network-health/events").json()
-    types = {item["event_type"] for item in events["items"]}
-    assert {"connectivity_check", "qod_granted", "qod_denied", "qod_released", "agent_error"} <= types
-    assert all(item["data_mode"] == MOCK_DATA_MODE for item in events["items"])
-    detail = client.get("/api/network-health/events/NETEVT-000004").json()
-    assert detail["payload"]["schema_version"] == NETWORK_CONTRACT
-    assert "input_summary" in detail
-    missing = client.get("/api/network-health/events/NETEVT-MISSING")
+    assert events["items"] == []
+    missing = client.get("/api/network-health/events/NETEVT-000004")
     assert missing.status_code == 404
     session = get_session_factory()()
     row = session.scalar(select(AgentIntegration).where(AgentIntegration.agent_code == NETWORK_AGENT_CODE))
@@ -152,7 +147,7 @@ def test_response_isolate_blocked_without_execution(client, test_database) -> No
     assert rec is not None
     assert rec.notification_sent is False
     assert rec.valve_command_sent is False
-    assert rec.safety_status == "blocked"
+    assert rec.safety_status == "agent_reported_unverified"
     session.close()
 
 
@@ -203,9 +198,9 @@ def test_no_network_decision_engine_table(test_database) -> None:
 def test_seed_idempotent_and_existing_apis(client, test_database) -> None:
     first = seed_database()
     second = seed_database()
-    assert first.mock_agent_runs == second.mock_agent_runs == 1
+    assert first.mock_agent_runs == second.mock_agent_runs == 0
     assert first.investigation_findings == second.investigation_findings == 0
-    assert first.network_events == second.network_events == 7
+    assert first.network_events == second.network_events == 0
     assert first.device_network_snapshots == second.device_network_snapshots == 9
     assert first.agent_audit_events == second.agent_audit_events
     assert client.get("/api/health").status_code == 200

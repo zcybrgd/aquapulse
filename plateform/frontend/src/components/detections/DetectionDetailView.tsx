@@ -67,7 +67,7 @@ export function DetectionDetailView({
           <p className="text-sm font-semibold text-teal">{detection.detection_number}</p>
           <DetectionPriorityBadge priority={detection.priority} />
           {detection.awaiting_agent_investigation ? (
-            <Badge className="bg-page text-ink-muted">Awaiting agent investigation</Badge>
+            <Badge className="bg-page text-ink-muted">Awaiting Investigation Agent result</Badge>
           ) : null}
           {detection.has_agent_finding ? <Badge className="bg-teal-light text-teal">Agent-assessed</Badge> : null}
           <DetectionStatusBadge status={detection.status} />
@@ -82,6 +82,13 @@ export function DetectionDetailView({
           and confidence come from the Investigation Agent when a mapped finding exists.
         </p>
       </div>
+
+      {!detection.agent_finding ? (
+        <Card className="min-w-0 p-5">
+          <h3 className="text-base font-semibold text-ink">Investigation Agent result</h3>
+          <p className="mt-2 text-sm text-ink-muted">Awaiting Investigation Agent result</p>
+        </Card>
+      ) : null}
 
       {detection.agent_finding ? (
         <Card className="min-w-0 border-teal/30 p-5">

@@ -124,7 +124,7 @@ def test_dashboard_summary_uses_persisted_incidents(client) -> None:
     payload = response.json()
     assert payload["active_incidents"] == 7
     assert payload["critical_incidents"] == 2
-    assert payload["estimated_water_loss_m3"] == 75.4
+    assert payload["estimated_water_loss_m3"] is None
     assert payload["total_sensors"] == 16
     assert payload["online_sensors"] == 12
 

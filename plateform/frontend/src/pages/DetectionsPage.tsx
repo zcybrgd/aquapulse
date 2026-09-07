@@ -18,7 +18,7 @@ type QueueTab = "agent" | "screening";
 
 export function DetectionsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<QueueTab>("agent");
+  const [tab, setTab] = useState<QueueTab>("screening");
   const { filters, setFilters, clearFilters, hasActiveFilters } = useDetectionFilters();
   const { items, total, stats, zones, rules, sensors, loading, error, reload } = useDetections(filters);
   const findings = useAgentFindings();
@@ -77,8 +77,8 @@ export function DetectionsPage() {
         findings.items.length === 0 ? (
           <div className="card">
             <EmptyState
-              title="No Investigation Agent results yet"
-              description="This queue stays empty until the Investigation Agent POSTs a batch to /api/integrations/agents/investigation/v1/results. Seeded mock findings are not shown."
+              title="Awaiting Investigation Agent result"
+              description="Waiting for integration. Findings appear after the Investigation Agent POSTs a validated batch."
             />
           </div>
         ) : (

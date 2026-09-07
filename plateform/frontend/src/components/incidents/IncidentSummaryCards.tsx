@@ -14,7 +14,7 @@ export function IncidentSummaryCards({ stats }: IncidentSummaryCardsProps) {
       <KpiCard
         label="Total incidents"
         value={formatNumber(stats.total)}
-        context="All records in the current mock set"
+        context="All records in the current catalogue"
         icon={Layers}
         delay={0.02}
       />
