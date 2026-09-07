@@ -94,7 +94,7 @@ async def _publish_state() -> None:
                 "pressure_psi": c.reported_pressure_psi,
                 "flow_rate_lps": c.reported_flow_lps,
                 "ambient_temp_c": c.ambient_temp_c,
-                # REMOVED: "active_fault" and "magnitude" ground-truth leaks
+                "active_fault": state.active_faults[cid].fault_type if cid in state.active_faults else None,
             }
             for cid, c in state.clusters.items()
         },

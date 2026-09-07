@@ -31,7 +31,16 @@ const CLASS_COLORS = {
   likely_connectivity_artifact: 0x38bdf8,
   insufficient_data: 0xa855f7,
 };
-const LEAK_FAULT_TYPES = new Set(["leak", "pipe_rupture", "pressure_drop"]);
+
+const LEAK_FAULT_TYPES = new Set([
+  "leak",
+  "pipe_rupture",
+  "pressure_drop",
+  "pipe_leak_minor",
+  "pipe_leak_moderate",
+  "pipe_leak_major",
+  "pipe_leak_catastrophic",
+]);
 
 const GRID_COLORS = {
   dark: { main: 0x2a3446, sub: 0x161c27 },
@@ -264,7 +273,10 @@ export function updateCluster(cid, data) {
     targetOffset = 0.42;
   }
   obj.valveTargetOffset = targetOffset;
-  obj.leakActive = LEAK_FAULT_TYPES.has(data.active_fault);
+  obj.leakActive = Boolean(
+    data.active_fault &&
+      (LEAK_FAULT_TYPES.has(data.active_fault) || data.active_fault.includes("leak") || data.active_fault.includes("rupture"))
+  );
   obj.leakPoints.visible = obj.leakActive;
 }
 

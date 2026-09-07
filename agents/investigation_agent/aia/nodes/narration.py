@@ -146,7 +146,7 @@ def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:
         else ""
     )
     detection_sentence = (
-        f"A {state.pressure_drop_pct:.1f}% pressure drop and {state.flow_surge_pct:.1f}% flow "
+        f"Deterministic Fallback: A {state.pressure_drop_pct:.1f}% pressure drop and {state.flow_surge_pct:.1f}% flow "
         f"change was detected at {state.sensor_cluster_id} (slope {state.pressure_slope:.2f} psi/min, "
         f"ambient temperature {current.ambient_temp_c:.1f} deg C{volume_loss_clause})."
     )
