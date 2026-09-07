@@ -25,12 +25,8 @@ def cleanup_all_slices(poll_interval=5, max_poll_seconds=180):
     all_slices = nac_client.slice.list_slices()
     print(f"Found {len(all_slices)} slice(s).\n")
 
-    # Build a lookup of attachments per slice_id so we can detach before deactivating
     try:
         all_attachments = nac_client.slice.get_device_attachments()
-        if all_attachments:
-            print("Sample attachment object:", all_attachments[0])
-            print("Available fields:", [a for a in dir(all_attachments[0]) if not a.startswith("_")])
     except Exception as e:
         print(f"⚠️ Could not fetch attachments: {e}")
         all_attachments = []
@@ -49,11 +45,10 @@ def cleanup_all_slices(poll_interval=5, max_poll_seconds=180):
         print(f"--- Processing '{name}' (state: {state}) ---")
 
         if state == "DELETED":
-            print(f"   Already deleted, skipping.\n")
+            print("   Already deleted, skipping.\n")
             continue
 
         if state == "OPERATING":
-            # Detach any devices/apps first — deactivation can silently stall otherwise
             attachments = _attachments_for(name)
             for att in attachments:
                 res_id = att.nac_resource_id
@@ -68,7 +63,7 @@ def cleanup_all_slices(poll_interval=5, max_poll_seconds=180):
                 nac_client.slice.deactivate(name)
             except Exception as e:
                 print(f"   ⚠️ Deactivate call failed: {e}\n")
-                continue  # don't burn 180s polling if the call itself errored
+                continue
 
             start = time.time()
             while state != "AVAILABLE" and (time.time() - start) < max_poll_seconds:
@@ -82,16 +77,9 @@ def cleanup_all_slices(poll_interval=5, max_poll_seconds=180):
                 print(f"   [waiting] state: {state}")
 
             if state != "AVAILABLE":
-                print(f"   ❌ '{name}' never reached AVAILABLE after {max_poll_seconds}s, skipping delete.\n")
-                continue
+                print(f"   ❌ '{name}' never reached AVAILABLE after {max_poll_seconds}s, attempting direct delete...\n")
 
-        if state == "PENDING":
-            print(f"   ⏳ '{name}' still PENDING (provisioning). Skipping — try again later.\n")
-            continue
-
-        if state == "FAILED":
-            print(f"   ⚠️ '{name}' is in FAILED state, attempting delete anyway...")
-
+        # FIX 3: PENDING, AVAILABLE, and FAILED slices are deleted directly
         try:
             nac_client.slice.delete_slice(name)
             print(f"   🗑️ Deleted '{name}'.\n")

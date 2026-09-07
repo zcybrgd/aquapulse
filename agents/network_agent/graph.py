@@ -68,7 +68,7 @@ if __name__ == "__main__":
             "device_id": "+99999991000",
             "zone_id": "zone-47.49_19.08",
             "alert_type": "FLOW_ANOMALY",
-            "severity_tier": 2,
+            "severity_tier": 3,
             "asset_criticality": 3,
             "confidence": 0.85,
             "app_server_ipv4": "8.8.8.8"
