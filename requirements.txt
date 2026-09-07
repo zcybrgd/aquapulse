@@ -10,3 +10,15 @@ twilio
 langchain-groq
 python-dotenv
 mistralai
+sqlalchemy
+pydantic-settings
+geoalchemy2
+scikit-learn>=1.3
+numpy>=1.24
+openai>=1.0
+pandas
+redis 
+
+
+# psycopg2-binary>=2.9  # TimescaleDBStore
+# httpx>=0.27            # HttpCamaraClient (live Nokia NaC sandbox)
