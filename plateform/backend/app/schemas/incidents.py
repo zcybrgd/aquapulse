@@ -22,14 +22,9 @@ class Classification(str, Enum):
 
 
 class IncidentStatus(str, Enum):
-    open = "open"
-    acknowledged = "acknowledged"
     investigating = "investigating"
     awaiting_approval = "awaiting_approval"
-    responding = "responding"
-    monitoring = "monitoring"
     resolved = "resolved"
-    false_alarm = "false_alarm"
 
 
 class ResolutionCode(str, Enum):

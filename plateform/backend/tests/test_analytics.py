@@ -115,7 +115,13 @@ def test_detection_and_incident_distributions(client) -> None:
     assert {item["key"] for item in incidents["by_severity"]} <= {"tier_1", "tier_2", "tier_3"}
     assert incidents["by_classification"]
     assert incidents["false_alarms"]["current"] == 1
-    assert incidents["resolved"]["current"] == 1
+    assert incidents["resolved"]["current"] == 2
+    assert {item["key"] for item in incidents["by_status"]} <= {
+        "investigating",
+        "awaiting_approval",
+        "resolved",
+    }
+    assert "Waiting for approval" in {item["label"] for item in incidents["by_status"]}
 
 
 def test_response_durations_and_nulls(client) -> None:

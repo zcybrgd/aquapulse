@@ -130,13 +130,10 @@ def test_screening_priority_label_and_awaiting_investigation(client) -> None:
 
 def test_network_draft_logs_and_unconfirmed_contract(client, test_database) -> None:
     summary = client.get("/api/network-health/summary").json()
-    assert summary["data_mode"] == MOCK_DATA_MODE
-    assert summary["contract_status"] == "Awaiting confirmation"
-    assert summary["connectivity_checks"] >= 1
-    assert summary["grants"] >= 1
-    assert summary["denials"] >= 1
-    assert summary["releases"] >= 1
-    assert summary["errors"] >= 1
+    assert "grants" not in summary
+    assert "contract_status" not in summary
+    assert summary["source_mode"] in {"seeded_demo", "nokia_simulator"}
+    assert summary["cellular_devices"] >= 1
     assert "health score" not in summary["note"].lower()
     events = client.get("/api/network-health/events").json()
     types = {item["event_type"] for item in events["items"]}
@@ -231,6 +228,7 @@ def test_seed_idempotent_and_existing_apis(client, test_database) -> None:
     assert first.mock_agent_runs == second.mock_agent_runs == 5
     assert first.investigation_findings == second.investigation_findings == 3
     assert first.network_events == second.network_events == 7
+    assert first.device_network_snapshots == second.device_network_snapshots == 9
     assert first.agent_audit_events == second.agent_audit_events
     assert client.get("/api/health").status_code == 200
     assert client.get("/api/incidents").status_code == 200

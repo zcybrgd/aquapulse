@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { CLASSIFICATION_LABELS } from "../../lib/incidents";
-import { formatDateTime, formatNumber } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
 import type { IncidentSummary } from "../../types/incidents";
 import { Card } from "../ui/Card";
 import { SeverityBadge } from "./SeverityBadge";
@@ -28,10 +28,9 @@ export function IncidentTable({ items }: IncidentListProps) {
               <th className="w-[11%] px-4 py-3">Severity</th>
               <th className="w-[14%] px-4 py-3">Classification</th>
               <th className="w-[14%] px-4 py-3">Location</th>
-              <th className="w-[12%] px-4 py-3">Status</th>
-              <th className="w-[10%] px-4 py-3">Detected</th>
-              <th className="w-[8%] px-4 py-3">Est. loss</th>
-              <th className="w-[8%] px-4 py-3">Assigned to</th>
+              <th className="w-[14%] px-4 py-3">Status</th>
+              <th className="w-[12%] px-4 py-3">Detected</th>
+              <th className="w-[12%] px-4 py-3">Assigned to</th>
               <th className="w-[5%] px-4 py-3">Action</th>
             </tr>
           </thead>
@@ -63,9 +62,6 @@ export function IncidentTable({ items }: IncidentListProps) {
                 </td>
                 <td className="px-4 py-3 align-top text-ink-muted">
                   {formatDateTime(incident.detected_at)}
-                </td>
-                <td className="px-4 py-3 align-top text-ink">
-                  {formatNumber(incident.estimated_water_loss_m3, 1)} m³
                 </td>
                 <td className="px-4 py-3 align-top text-ink-muted">
                   {incident.assigned_operator ?? "Unassigned"}
@@ -115,12 +111,6 @@ export function IncidentCardList({ items }: IncidentListProps) {
               <div>
                 <dt>Detected</dt>
                 <dd className="mt-0.5 text-ink">{formatDateTime(incident.detected_at)}</dd>
-              </div>
-              <div>
-                <dt>Estimated loss</dt>
-                <dd className="mt-0.5 text-ink">
-                  {formatNumber(incident.estimated_water_loss_m3, 1)} m³
-                </dd>
               </div>
               <div>
                 <dt>Assigned to</dt>

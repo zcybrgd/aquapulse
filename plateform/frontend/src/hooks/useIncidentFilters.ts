@@ -29,14 +29,9 @@ function asSeverity(value: string | null): IncidentFilters["severity"] {
 
 function asStatus(value: string | null): IncidentFilters["status"] {
   const allowed: IncidentStatus[] = [
-    "open",
-    "acknowledged",
     "investigating",
     "awaiting_approval",
-    "responding",
-    "monitoring",
     "resolved",
-    "false_alarm",
   ];
   return allowed.includes(value as IncidentStatus) ? (value as IncidentStatus) : "";
 }
@@ -61,7 +56,6 @@ function asSortField(value: string | null): IncidentSortField {
     "detected_at",
     "severity",
     "status",
-    "estimated_loss",
     "priority",
   ];
   return allowed.includes(value as IncidentSortField)

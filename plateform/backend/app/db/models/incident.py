@@ -45,14 +45,11 @@ class Incident(UUIDPrimaryKeyMixin, Base):
             name="resolved_requires_closure",
         ),
         CheckConstraint(
-            "status <> 'false_alarm' OR ("
-            "resolution_code = 'false_alarm' AND resolved_at IS NOT NULL "
-            "AND resolved_by IS NOT NULL AND resolution_summary IS NOT NULL "
-            "AND btrim(resolution_summary) <> '')",
-            name="false_alarm_requires_code",
+            "status IN ('investigating', 'awaiting_approval', 'resolved')",
+            name="status_allowed",
         ),
         CheckConstraint(
-            "status IN ('resolved', 'false_alarm') OR ("
+            "status = 'resolved' OR ("
             "resolved_at IS NULL AND resolved_by IS NULL "
             "AND resolution_code IS NULL AND resolution_summary IS NULL)",
             name="active_clears_resolution",

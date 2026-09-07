@@ -139,11 +139,11 @@ def seed_operations_demo(session: Session) -> None:
             session.delete(task)
         session.flush()
 
-    # Unacknowledged open incident stays INC-1838.
+    # INC-1838 stays investigating and unacknowledged. INC-1836 keeps investigating plus ack metadata.
     acknowledged = _incident(session, "INC-1836")
-    if acknowledged is not None and acknowledged.status == "open":
+    if acknowledged is not None and acknowledged.acknowledged_at is None:
         when = SEED_NOW - timedelta(minutes=10)
-        acknowledged.status = "acknowledged"
+        acknowledged.status = "investigating"
         acknowledged.acknowledged_at = when
         acknowledged.acknowledged_by = DEMO_OPERATOR
         acknowledged.updated_at = when
@@ -157,7 +157,7 @@ def seed_operations_demo(session: Session) -> None:
             description="Control room acknowledged the incomplete telemetry window.",
             actor_name=DEMO_OPERATOR,
             timestamp=when,
-            status="acknowledged",
+            status="investigating",
         )
 
     resolved = _incident(session, "INC-1834")
@@ -180,7 +180,7 @@ def seed_operations_demo(session: Session) -> None:
         )
 
     false_alarm = _incident(session, "INC-1837")
-    if false_alarm is not None and false_alarm.status == "false_alarm":
+    if false_alarm is not None and false_alarm.status == "resolved":
         false_alarm.resolved_at = false_alarm.updated_at
         false_alarm.resolved_by = false_alarm.assigned_operator or "Yousef Al Qahtani"
         false_alarm.resolution_code = "false_alarm"
@@ -194,13 +194,14 @@ def seed_operations_demo(session: Session) -> None:
             description="Recorded as a normal demand spike. Evidence and history were kept.",
             actor_name=false_alarm.resolved_by,
             timestamp=false_alarm.updated_at,
-            status="false_alarm",
+            status="resolved",
             metadata={"resolution_code": "false_alarm"},
         )
 
     responding = _incident(session, "INC-1842")
     if responding is None:
         return
+    responding.status = "investigating"
     if responding.response_started_at is None:
         responding.response_started_at = SEED_NOW - timedelta(hours=2)
     if not responding.assigned_operator:
@@ -261,7 +262,7 @@ def seed_operations_demo(session: Session) -> None:
         description="Coordinated response started. No physical command was executed.",
         actor_name=DEMO_SUPERVISOR,
         timestamp=responding.response_started_at or SEED_NOW,
-        status="responding",
+        status="investigating",
     )
     _add_event(
         session,
@@ -272,7 +273,7 @@ def seed_operations_demo(session: Session) -> None:
         description="Started TASK-000001: Verify isolation readiness at Harbour Segment 7.",
         actor_name=DEMO_SUPERVISOR,
         timestamp=SEED_NOW - timedelta(hours=4),
-        status="responding",
+        status="investigating",
         task=overdue,
     )
     _add_event(
@@ -284,6 +285,6 @@ def seed_operations_demo(session: Session) -> None:
         description="Completed TASK-000002 after reviewing corroborating telemetry.",
         actor_name=DEMO_OPERATOR,
         timestamp=SEED_NOW - timedelta(minutes=50),
-        status="responding",
+        status="investigating",
         task=completed,
     )

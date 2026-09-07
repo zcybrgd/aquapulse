@@ -12,7 +12,7 @@ function incidentPath(id: string, search: string): string {
 }
 
 function ActionCell({ item, search }: { item: OperationsQueueItem; search: string }) {
-  const action = operationsPrimaryAction(item.allowed_actions);
+  const action = operationsPrimaryAction(item.allowed_actions, item.status);
   return (
     <Link
       to={incidentPath(item.id, search)}
@@ -80,7 +80,7 @@ export function OperationsCardList({ items }: { items: OperationsQueueItem[] }) 
   return (
     <ul className="space-y-3 xl:hidden">
       {items.map((item) => {
-        const action = operationsPrimaryAction(item.allowed_actions);
+        const action = operationsPrimaryAction(item.allowed_actions, item.status);
         return (
           <li key={item.id} className="card p-4">
             <div className="flex flex-wrap items-center gap-2">

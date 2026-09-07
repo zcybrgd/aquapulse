@@ -3,7 +3,6 @@ import { DashboardSkeleton } from "../components/dashboard/DashboardSkeleton";
 import { DetectionPreview } from "../components/dashboard/DetectionPreview";
 import { IncidentPreview } from "../components/dashboard/IncidentPreview";
 import { KpiGrid } from "../components/dashboard/KpiGrid";
-import { NetworkHealthPanel } from "../components/dashboard/NetworkHealthPanel";
 import { NetworkMapPreview } from "../components/dashboard/NetworkMapPreview";
 import { TelemetryChart } from "../components/dashboard/TelemetryChart";
 import { ErrorState } from "../components/ui/ErrorState";
@@ -45,10 +44,7 @@ export function OverviewPage() {
           <KpiGrid summary={summary} />
           <DetectionPreview />
           <TelemetryChart readings={telemetry} range={range} onRangeChange={setRange} />
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <IncidentPreview />
-            <NetworkHealthPanel summary={summary} telemetry={telemetry} />
-          </div>
+          <IncidentPreview />
           <NetworkMapPreview />
         </>
       ) : null}

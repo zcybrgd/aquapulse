@@ -47,9 +47,9 @@ export function IncidentTelemetryChart({ incident }: IncidentTelemetryChartProps
           </p>
         </div>
         <div className="rounded-2xl bg-page px-3 py-2">
-          <p className="text-xs text-ink-muted">Estimated water loss</p>
+          <p className="text-xs text-ink-muted">Population affected</p>
           <p className="mt-1 text-sm font-semibold text-ink">
-            {formatNumber(incident.estimated_water_loss_m3, 1)} m³
+            {formatNumber(incident.population_affected, 0)}
           </p>
         </div>
         <div className="rounded-2xl bg-page px-3 py-2">

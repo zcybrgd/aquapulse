@@ -1,7 +1,9 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
+from app.network.providers import build_device_network_provider
 from app.services.assets import AssetService
 from app.services.detections import DetectionService
 from app.services.incidents import IncidentService
@@ -61,8 +63,15 @@ def get_maintenance_service(db: Session = Depends(get_db)) -> MaintenanceService
     return MaintenanceService(db)
 
 
-def get_network_health_service(db: Session = Depends(get_db)) -> NetworkHealthService:
-    return NetworkHealthService(db)
+def get_device_network_provider():
+    return build_device_network_provider(get_settings())
+
+
+def get_network_health_service(
+    db: Session = Depends(get_db),
+    provider=Depends(get_device_network_provider),
+) -> NetworkHealthService:
+    return NetworkHealthService(db, provider=provider, settings=get_settings())
 
 
 def get_agent_audit_service(db: Session = Depends(get_db)) -> AgentAuditService:

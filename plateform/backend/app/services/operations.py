@@ -34,9 +34,9 @@ from app.incident.workflow import (
     RETURN_INVESTIGATION_STATUSES,
     START_INVESTIGATION_STATUSES,
     START_RESPONSE_STATUSES,
-    TASK_MANAGE_STATUSES,
     TERMINAL_STATUSES,
     allowed_actions,
+    can_manage_tasks,
 )
 from app.repositories.incidents import IncidentRepository
 from app.repositories.response_tasks import ResponseTaskRepository
@@ -81,6 +81,13 @@ EVENT_TITLES = {
     "incident_false_alarm": "Marked as false alarm",
     "incident_reopened": "Incident reopened",
 }
+
+
+def _actions_for(row: Incident) -> list[str]:
+    actions = allowed_actions(row.status)
+    if can_manage_tasks(row) and "manage_tasks" not in actions:
+        actions.append("manage_tasks")
+    return actions
 
 
 class OperationsService:
@@ -195,7 +202,7 @@ class OperationsService:
             resolved_by=row.resolved_by,
             resolution_code=code,
             resolution_summary=row.resolution_summary,
-            allowed_actions=allowed_actions(row.status),
+            allowed_actions=_actions_for(row),
             incomplete_task_count=incomplete,
             tasks=tasks,
         )
@@ -270,6 +277,8 @@ class OperationsService:
                 if task.due_at is not None and task.due_at < now
             ]
             latest = f"Status {row.status.replace('_', ' ')}"
+            if row.status == "awaiting_approval":
+                latest = "Waiting for approval"
             latest_at = row.updated_at
             summary = to_summary(row)
             items.append(
@@ -279,7 +288,7 @@ class OperationsService:
                     acknowledged_by=row.acknowledged_by,
                     assigned_to=row.assigned_operator,
                     response_started_at=row.response_started_at,
-                    allowed_actions=allowed_actions(row.status),
+                    allowed_actions=_actions_for(row),
                     open_task_count=len(open_tasks),
                     overdue_task_count=len(overdue),
                     completed_task_count=sum(1 for task in tasks if task.status == "completed"),
@@ -292,11 +301,21 @@ class OperationsService:
         active = [row for row in all_rows if row.status in ACTIVE_STATUSES]
         summary = OperationsSummary(
             active_incidents=len(active),
-            unacknowledged=len([row for row in active if row.status == "open"]),
-            acknowledged=len([row for row in active if row.status == "acknowledged"]),
+            unacknowledged=len(
+                [row for row in active if row.status == "investigating" and row.acknowledged_at is None]
+            ),
+            acknowledged=len(
+                [row for row in active if row.status == "investigating" and row.acknowledged_at is not None]
+            ),
             investigating=len([row for row in active if row.status == "investigating"]),
             awaiting_approval=len([row for row in active if row.status == "awaiting_approval"]),
-            responding=len([row for row in active if row.status == "responding"]),
+            responding=len(
+                [
+                    row
+                    for row in active
+                    if row.status == "investigating" and row.response_started_at is not None
+                ]
+            ),
             overdue_tasks=self.tasks.overdue_count(now),
             critical_active=len([row for row in active if row.severity_tier == 3]),
         )
@@ -316,13 +335,12 @@ class OperationsService:
 
     def acknowledge(self, incident_id: str, payload: AcknowledgeRequest) -> IncidentOperationsResponse:
         row = self._lock_incident(incident_id)
-        if row.status == IncidentStatus.acknowledged.value:
+        if row.status == IncidentStatus.investigating.value and row.acknowledged_at is not None:
             self.session.rollback()
             return self.get_operations(incident_id)
         if row.status not in ACKNOWLEDGE_STATUSES:
             self._conflict(row, action="acknowledge")
         now = utc_now()
-        row.status = IncidentStatus.acknowledged.value
         row.acknowledged_at = now
         row.acknowledged_by = payload.actor_name
         row.updated_at = now
@@ -354,6 +372,9 @@ class OperationsService:
     def start_investigation(self, incident_id: str, payload: NoteRequest) -> IncidentOperationsResponse:
         row = self._lock_incident(incident_id)
         returning = row.status in RETURN_INVESTIGATION_STATUSES
+        if row.status == IncidentStatus.investigating.value:
+            self.session.rollback()
+            return self.get_operations(incident_id)
         if row.status not in START_INVESTIGATION_STATUSES and not returning:
             self._conflict(row, action="start_investigation")
         row.status = IncidentStatus.investigating.value
@@ -391,13 +412,20 @@ class OperationsService:
         row = self._lock_incident(incident_id)
         if row.status not in START_RESPONSE_STATUSES:
             self._conflict(row, action="start_response")
+        if (
+            row.status == IncidentStatus.investigating.value
+            and row.response_started_at is not None
+        ):
+            self.session.rollback()
+            return self.get_operations(incident_id)
         if not row.assigned_operator:
             raise IncidentConflictError(
                 "Assign an operator or team before starting the response.",
                 code="incident_assignment_required",
             )
         now = utc_now()
-        row.status = IncidentStatus.responding.value
+        if row.status == IncidentStatus.awaiting_approval.value:
+            row.status = IncidentStatus.investigating.value
         if row.response_started_at is None:
             row.response_started_at = now
         row.updated_at = now
@@ -465,7 +493,7 @@ class OperationsService:
         if row.status not in FALSE_ALARM_STATUSES:
             self._conflict(row, action="mark_false_alarm")
         now = utc_now()
-        row.status = IncidentStatus.false_alarm.value
+        row.status = IncidentStatus.resolved.value
         row.resolved_at = now
         row.resolved_by = payload.actor_name
         row.resolution_code = ResolutionCode.false_alarm.value
@@ -485,7 +513,7 @@ class OperationsService:
         row = self._lock_incident(incident_id)
         if row.status not in REOPEN_STATUSES:
             self._conflict(row, action="reopen")
-        row.status = IncidentStatus.open.value
+        row.status = IncidentStatus.investigating.value
         row.resolved_at = None
         row.resolved_by = None
         row.resolution_code = None
@@ -505,7 +533,7 @@ class OperationsService:
 
     def create_task(self, incident_id: str, payload: CreateResponseTaskRequest) -> ResponseTaskItem:
         row = self._lock_incident(incident_id)
-        if row.status not in TASK_MANAGE_STATUSES:
+        if not can_manage_tasks(row):
             self._conflict(row, action="manage_tasks")
         now = utc_now()
         task = IncidentResponseTask(
@@ -544,7 +572,7 @@ class OperationsService:
         payload: UpdateResponseTaskRequest,
     ) -> ResponseTaskItem:
         row, task = self._lock_task(incident_id, task_id)
-        if row.status not in TASK_MANAGE_STATUSES:
+        if not can_manage_tasks(row):
             self._conflict(row, action="manage_tasks")
         if task.status not in OPEN_TASK_STATUSES:
             raise IncidentConflictError(
@@ -569,7 +597,7 @@ class OperationsService:
 
     def start_task(self, incident_id: str, task_id: str, payload: NoteRequest) -> ResponseTaskItem:
         row, task = self._lock_task(incident_id, task_id)
-        if row.status not in TASK_MANAGE_STATUSES:
+        if not can_manage_tasks(row):
             self._conflict(row, action="manage_tasks")
         if task.status != ResponseTaskStatus.todo.value:
             raise IncidentConflictError(
@@ -599,7 +627,7 @@ class OperationsService:
         payload: CompleteResponseTaskRequest,
     ) -> ResponseTaskItem:
         row, task = self._lock_task(incident_id, task_id)
-        if row.status not in TASK_MANAGE_STATUSES:
+        if not can_manage_tasks(row):
             self._conflict(row, action="manage_tasks")
         if task.status not in OPEN_TASK_STATUSES:
             raise IncidentConflictError(
@@ -628,7 +656,7 @@ class OperationsService:
 
     def cancel_task(self, incident_id: str, task_id: str, payload: NoteRequest) -> ResponseTaskItem:
         row, task = self._lock_task(incident_id, task_id)
-        if row.status not in TASK_MANAGE_STATUSES:
+        if not can_manage_tasks(row):
             self._conflict(row, action="manage_tasks")
         if task.status not in OPEN_TASK_STATUSES:
             raise IncidentConflictError(

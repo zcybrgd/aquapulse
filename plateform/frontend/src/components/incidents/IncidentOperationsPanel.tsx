@@ -28,7 +28,7 @@ export function IncidentOperationsPanel({
   const { actorName, setActorName, raw } = useActorName();
   const workflow = useOperationsWorkflow();
   const actions = new Set(operations.allowed_actions);
-  const terminal = operations.status === "resolved" || operations.status === "false_alarm";
+  const terminal = operations.status === "resolved";
   const [note, setNote] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [approvalOpen, setApprovalOpen] = useState(false);
@@ -148,7 +148,9 @@ export function IncidentOperationsPanel({
             disabled={workflow.busy}
             onClick={() => after(workflow.startResponse(incidentId, actorName, note || undefined))}
           >
-            Start response
+            {operations.status === "awaiting_approval"
+              ? "Approve and start response"
+              : "Start response"}
           </Button>
         ) : null}
         {actions.has("add_note") ? (

@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Bot, Cable, Cpu, Headset, LayoutDashboard, Map, ScanSearch, ScrollText, Settings, TriangleAlert, Wifi, Wrench } from "lucide-react";
+import { Activity, Cable, Cpu, Headset, LayoutDashboard, Map, ScanSearch, ScrollText, Settings, TriangleAlert, Wifi, Wrench } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -16,12 +16,10 @@ export const primaryNav: NavItem[] = [
   { label: "Investigation Queue", path: "/detections", title: "Investigation Queue", icon: ScanSearch },
   { label: "Assets", path: "/assets", title: "Asset Registry", icon: Cpu },
   { label: "Maintenance", path: "/maintenance", title: "Maintenance Center", icon: Wrench },
-  { label: "AI Agents", path: "/agents", title: "AI Agents", icon: Bot },
   { label: "Integrations", path: "/integrations", title: "Integration Readiness", icon: Cable },
   { label: "Network Health", path: "/network", title: "Network Health", icon: Wifi },
   { label: "Analytics", path: "/analytics", title: "Analytics", icon: Activity },
   { label: "Agent Audit", path: "/agent-audit", title: "Agent Audit Trail", icon: ScrollText },
-  { label: "Audit Trail", path: "/audit", title: "Operator Audit Trail", icon: ScrollText },
 ];
 
 export const utilityNav: NavItem[] = [
@@ -54,6 +52,9 @@ export function getPageTitle(pathname: string): string {
   }
   if (/^\/agent-audit\/runs\/.+/.test(pathname)) {
     return "Agent audit run";
+  }
+  if (pathname === "/network-health") {
+    return "Network Health";
   }
   const match = allNavItems.find((item) => item.path === pathname);
   return match?.title ?? "AquaPulse";

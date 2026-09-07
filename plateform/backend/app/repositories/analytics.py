@@ -235,7 +235,9 @@ class AnalyticsRepository:
         stmt = select(
             func.count().label("created"),
             func.count().filter(Incident.status == "resolved").label("resolved"),
-            func.count().filter(Incident.status == "false_alarm").label("false_alarms"),
+            func.count()
+            .filter((Incident.status == "resolved") & (Incident.resolution_code == "false_alarm"))
+            .label("false_alarms"),
         ).select_from(Incident)
         stmt = self._incident_filters(stmt, start, end, zone, sensor, inclusive_end, time_column=Incident.detected_at)
         row = self.session.execute(stmt).one()

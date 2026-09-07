@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import get_incident_service, get_maintenance_service, get_operations_service
+from app.api.deps import get_incident_service, get_maintenance_service, get_network_health_service, get_operations_service
 from app.schemas.incidents import (
     AcknowledgeRequest,
     AssignIncidentRequest,
@@ -24,8 +24,10 @@ from app.schemas.incidents import (
     UpdateResponseTaskRequest,
 )
 from app.schemas.maintenance import IncidentMaintenanceResponse
+from app.schemas.network_health import DeviceNetworkRefreshRequest, IncidentDeviceNetworkContext
 from app.services.incidents import IncidentService
 from app.services.maintenance import MaintenanceService
+from app.services.network_health import NetworkHealthService
 from app.services.operations import OperationsService
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
@@ -59,6 +61,24 @@ def get_incident_detail(
     service: IncidentService = Depends(get_incident_service),
 ) -> IncidentDetail:
     return service.get_incident(incident_id)
+
+
+@router.get("/{incident_id}/device-network", response_model=IncidentDeviceNetworkContext)
+def get_incident_device_network(
+    incident_id: str,
+    service: NetworkHealthService = Depends(get_network_health_service),
+) -> IncidentDeviceNetworkContext:
+    return service.incident_context(incident_id)
+
+
+@router.post("/{incident_id}/device-network/refresh", response_model=IncidentDeviceNetworkContext)
+async def refresh_incident_device_network(
+    incident_id: str,
+    payload: DeviceNetworkRefreshRequest | None = None,
+    service: NetworkHealthService = Depends(get_network_health_service),
+) -> IncidentDeviceNetworkContext:
+    body = payload or DeviceNetworkRefreshRequest()
+    return await service.refresh_incident_context(incident_id, force=body.force)
 
 
 @router.get("/{incident_id}/timeline", response_model=TimelineResponse)

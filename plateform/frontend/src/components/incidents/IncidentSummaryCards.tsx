@@ -27,7 +27,7 @@ export function IncidentSummaryCards({ stats }: IncidentSummaryCardsProps) {
         delay={0.06}
       />
       <KpiCard
-        label="Awaiting approval"
+        label="Waiting for approval"
         value={formatNumber(stats.awaitingApproval)}
         context="Waiting for operator decision"
         icon={Clock3}
@@ -36,7 +36,7 @@ export function IncidentSummaryCards({ stats }: IncidentSummaryCardsProps) {
       <KpiCard
         label="Under investigation"
         value={formatNumber(stats.investigating)}
-        context="Agents still working the case"
+        context="Incidents currently being investigated"
         icon={Search}
         delay={0.14}
       />

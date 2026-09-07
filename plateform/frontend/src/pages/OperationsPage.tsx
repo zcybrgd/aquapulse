@@ -76,9 +76,9 @@ export function OperationsPage() {
       {summary ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <Kpi label="Active" value={summary.active_incidents} hint="Open operational work" />
-          <Kpi label="Unacknowledged" value={summary.unacknowledged} hint="Still waiting in open" />
-          <Kpi label="Responding" value={summary.responding} hint="Coordinated response" />
-          <Kpi label="Awaiting approval" value={summary.awaiting_approval} hint="Needs a decision" />
+          <Kpi label="Unacknowledged" value={summary.unacknowledged} hint="Still waiting to be acknowledged" />
+          <Kpi label="Response in progress" value={summary.responding} hint="Investigation after response start" />
+          <Kpi label="Waiting for approval" value={summary.awaiting_approval} hint="Needs a decision" />
           <Kpi label="Overdue tasks" value={summary.overdue_tasks} hint="Past due, still open" />
           <Kpi label="Critical active" value={summary.critical_active} hint="Tier 3 in progress" />
         </div>

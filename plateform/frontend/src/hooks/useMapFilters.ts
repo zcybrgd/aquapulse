@@ -23,14 +23,9 @@ function asSeverity(value: string | null): MapFilters["incident_severity"] {
 
 function asIncidentStatus(value: string | null): MapFilters["incident_status"] {
   const allowed: IncidentStatus[] = [
-    "open",
-    "acknowledged",
     "investigating",
     "awaiting_approval",
-    "responding",
-    "monitoring",
     "resolved",
-    "false_alarm",
   ];
   return allowed.includes(value as IncidentStatus) ? (value as IncidentStatus) : "";
 }

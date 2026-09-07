@@ -36,7 +36,7 @@ export function MaintenancePage() {
   const summary = data?.summary;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
+    <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">Maintenance Center</h2>
@@ -94,8 +94,8 @@ export function MaintenancePage() {
             onClear={clearFilters}
           />
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
-            <div className="min-w-0">
+          <div className="grid grid-cols-1 items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 overflow-hidden">
               {data.items.length === 0 ? (
                 <Card>
                   <EmptyState
@@ -110,7 +110,7 @@ export function MaintenancePage() {
                 </>
               )}
             </div>
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-4 2xl:w-80 2xl:max-w-full">
               <UpcomingPanel items={upcoming} />
               <Card className="p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-critical">Safety</p>

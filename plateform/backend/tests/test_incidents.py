@@ -22,14 +22,19 @@ def test_incident_list(client) -> None:
     assert [item["id"] for item in payload["items"]] == [
         "INC-1835",
         "INC-1842",
+        "INC-1838",
         "INC-1833",
         "INC-1841",
-        "INC-1838",
         "INC-1834",
         "INC-1836",
         "INC-1840",
         "INC-1837",
     ]
+    assert {item["status"] for item in payload["items"]} <= {
+        "investigating",
+        "awaiting_approval",
+        "resolved",
+    }
 
 
 def test_incident_detail_preserves_public_id(client) -> None:

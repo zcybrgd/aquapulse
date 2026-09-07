@@ -4,28 +4,28 @@ import { useSearchParams } from "react-router-dom";
 import type { NetworkFilters } from "../types/networkHealth";
 
 const EMPTY: NetworkFilters = {
-  event_type: "",
-  status: "",
-  device: "",
-  cluster: "",
-  incident: "",
   search: "",
-  start: "",
-  end: "",
+  zone: "",
+  asset_type: "",
+  reachability: "",
+  location_available: "",
+  cellular_available: "",
+  source_mode: "",
+  device: "",
 };
 
 export function useNetworkHealthFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo<NetworkFilters>(
     () => ({
-      event_type: searchParams.get("event_type") ?? "",
-      status: searchParams.get("status") ?? "",
-      device: searchParams.get("device") ?? "",
-      cluster: searchParams.get("cluster") ?? "",
-      incident: searchParams.get("incident") ?? "",
       search: searchParams.get("q") ?? "",
-      start: searchParams.get("start") ?? "",
-      end: searchParams.get("end") ?? "",
+      zone: searchParams.get("zone") ?? "",
+      asset_type: searchParams.get("type") ?? "",
+      reachability: searchParams.get("reachability") ?? "",
+      location_available: searchParams.get("location") ?? "",
+      cellular_available: searchParams.get("cellular") ?? "",
+      source_mode: searchParams.get("source") ?? "",
+      device: searchParams.get("device") ?? "",
     }),
     [searchParams],
   );
@@ -33,14 +33,14 @@ export function useNetworkHealthFilters() {
   const replaceParams = useCallback(
     (next: NetworkFilters) => {
       const params = new URLSearchParams();
-      if (next.event_type.trim()) params.set("event_type", next.event_type.trim());
-      if (next.status.trim()) params.set("status", next.status.trim());
-      if (next.device.trim()) params.set("device", next.device.trim());
-      if (next.cluster.trim()) params.set("cluster", next.cluster.trim());
-      if (next.incident.trim()) params.set("incident", next.incident.trim());
       if (next.search.trim()) params.set("q", next.search.trim());
-      if (next.start.trim()) params.set("start", next.start.trim());
-      if (next.end.trim()) params.set("end", next.end.trim());
+      if (next.zone.trim()) params.set("zone", next.zone.trim());
+      if (next.asset_type.trim()) params.set("type", next.asset_type.trim());
+      if (next.reachability.trim()) params.set("reachability", next.reachability.trim());
+      if (next.location_available.trim()) params.set("location", next.location_available.trim());
+      if (next.cellular_available.trim()) params.set("cellular", next.cellular_available.trim());
+      if (next.source_mode.trim()) params.set("source", next.source_mode.trim());
+      if (next.device.trim()) params.set("device", next.device.trim());
       setSearchParams(params, { replace: true });
     },
     [setSearchParams],
@@ -54,7 +54,15 @@ export function useNetworkHealthFilters() {
   return {
     filters,
     setFilters,
-    clearFilters: () => replaceParams(EMPTY),
-    hasActiveFilters: Object.values(filters).some((value) => value.trim()),
+    clearFilters: () => replaceParams({ ...EMPTY, device: filters.device }),
+    hasActiveFilters: [
+      filters.search,
+      filters.zone,
+      filters.asset_type,
+      filters.reachability,
+      filters.location_available,
+      filters.cellular_available,
+      filters.source_mode,
+    ].some((value) => value.trim()),
   };
 }

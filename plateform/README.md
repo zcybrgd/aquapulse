@@ -17,7 +17,8 @@ This repository currently includes **Steps 1–12**:
 - Step 11: Agent Integration Readiness Gateway (contracts, adapters, mappings, mock services)
 - Step 11.1: Device location, direct zone, and cellular identity (masked MSISDN)
 - Maintenance Center (0010): plans, work orders, append-only history (present, not expanded in Step 12)
-- Step 12: Agent-Native Network Health and Unified Audit Trail
+- Step 12: Unified Agent Audit Trail (historical Network Agent draft events remain stored)
+- Device Network Health: backend Nokia Network as Code / CAMARA snapshots (not an agent)
 
 Authentication, real IoT/SCADA ingestion, Kafka, WebSockets, live AI agent execution, automatic incident creation, real CAMARA APIs, valve actuation, notifications, and automatic background scheduling remain out of scope.
 
@@ -401,7 +402,7 @@ From `backend/` with the virtual environment active:
 python -m app.scripts.seed_database
 ```
 
-The command is idempotent. Running it twice updates the same organization, zones, assets, nine incidents (`INC-1833` through `INC-1842`), demonstration geometries, historical `sensor_readings`, six versioned detection rules, nine maintenance plans (`MPLAN-000001`–`MPLAN-000009`), six demonstration work orders (`MWO-000001`–`MWO-000006`), five mock agent runs (`AGRUN-000201`–`AGRUN-000205`), three Investigation Agent findings (`cluster-desert-042`–`044`), and seven Network Agent draft events (`NETEVT-000001`–`000007`). It does not duplicate `incident_telemetry` (incident evidence) or sensor readings. It does not create detections or incidents from rules. It does not execute agents, CAMARA, notifications, or valve commands. It does not start the maintenance generator.
+The command is idempotent. Running it twice updates the same organization, zones, assets, nine incidents (`INC-1833` through `INC-1842`), demonstration geometries, historical `sensor_readings`, six versioned detection rules, nine maintenance plans (`MPLAN-000001`–`MPLAN-000009`), six demonstration work orders (`MWO-000001`–`MWO-000006`), five mock agent runs (`AGRUN-000201`–`AGRUN-000205`), three Investigation Agent findings (`cluster-desert-042`–`044`), seven historical Network Agent draft events (`NETEVT-000001`–`000007`), and nine device-network snapshots (`DNS-000001`–`000009`). It does not duplicate `incident_telemetry` (incident evidence) or sensor readings. It does not create detections or incidents from rules. It does not execute agents, live Nokia/CAMARA calls, notifications, or valve commands. It does not start the maintenance generator.
 
 Historical sensor seed: 24 hours of 5-minute readings for all 16 sensors, ending at the frozen demo clock (`2026-09-01 07:45 UTC`). Offline sensors stop six hours before that clock. Values are deterministic and labelled `data_mode: simulated`.
 
@@ -867,9 +868,103 @@ Pages to review:
 - `/assets/:assetId` — Asset Details maintenance section
 - `/incidents/:incidentId` — related maintenance (read-only)
 
-### Agent-Native Network Health and Unified Audit Trail (Step 12)
+### Device Network Health (Nokia / CAMARA)
 
-AquaPulse stores, maps, displays and enforces safety around agent outputs. It does **not** confirm anomalies, classify instrument faults, calculate final confidence or severity, decide QoD/CAMARA actions, choose a Response Agent decision, or decide valve isolation.
+**Network Health does not use an agent.** The `/network-health` page monitors AquaPulse devices using snapshots stored in PostgreSQL. Future live data comes from **Nokia Network as Code / CAMARA APIs called only by the AquaPulse backend**. React never calls Nokia or RapidAPI. Investigation Agent, Response Agent and Network Agent are not involved.
+
+The current environment uses **demonstration / simulator data**. `NOKIA_NETWORK_API_ENABLED` defaults to `false` and `NOKIA_NETWORK_API_MODE` defaults to `mock`. The API starts without Nokia credentials.
+
+| Information | Source |
+| --- | --- |
+| Device identity/type | `assets` |
+| Zone and registered location | PostgreSQL / PostGIS |
+| Phone / MSISDN | `assets.device_msisdn` (masked in public APIs) |
+| Reachability | Nokia Device Reachability API via backend provider |
+| Network-derived location | Nokia Location Retrieval API via backend provider |
+| Last sensor reading | TimescaleDB |
+| Incident status | AquaPulse incident workflow |
+
+Important distinctions:
+
+- Nokia reachability (`reachable` / `unreachable` / `unknown`) is **not** incident status (`investigating` / `awaiting_approval` / `resolved`).
+- The registered PostGIS point remains the authoritative installation location for fixed infrastructure.
+- A Nokia location is a network-derived observation with an accuracy radius. It does **not** replace the registered location and is not GPS-level precision.
+- Devices without an MSISDN cannot use these Nokia APIs (`not_supported`).
+- Refresh never triggers agents, incidents, notifications or valve commands.
+
+#### Provider architecture
+
+Routes depend on `DeviceNetworkProvider`:
+
+- `DisabledDeviceNetworkProvider`
+- `MockNokiaDeviceNetworkProvider` (default)
+- `HttpNokiaDeviceNetworkProvider` (live HTTP, credentials required)
+
+Nokia/RapidAPI details stay in the HTTP adapter, not in FastAPI routes.
+
+#### Environment
+
+```text
+NOKIA_NETWORK_API_ENABLED=false
+NOKIA_NETWORK_API_MODE=mock
+NOKIA_NETWORK_API_BASE_URL=
+NOKIA_NETWORK_API_KEY=
+NOKIA_NETWORK_API_HOST=
+NOKIA_LOCATION_PATH=/location-retrieval/v0.3/retrieve
+NOKIA_REACHABILITY_PATH=/device-reachability-status/v0.7/retrieve
+NOKIA_NETWORK_TIMEOUT_SECONDS=10
+NOKIA_NETWORK_CACHE_SECONDS=300
+```
+
+Modes:
+
+- `mock` (default, including when the API is disabled) → `source_mode: seeded_demo`
+- `simulator` → `source_mode: nokia_simulator`
+- `live` with a trusted base URL and key → `source_mode: nokia_live`
+- `disabled` → no external lookup (`not_checked`)
+
+Remote URLs come only from this trusted configuration. Requests use explicit timeouts and a bounded retry for safe retrieval only. Tests must not call the internet.
+
+**Privacy:** public APIs never return a raw MSISDN or unsanitized Nokia payloads. API keys and authorization headers are redacted recursively before storage. Human-readable logs store only masked identifiers. Location data is sensitive.
+
+**Authentication / authorization for these endpoints is a documented future production requirement.** It is not implemented here.
+
+**Exposed-key warning:** if a Nokia / RapidAPI key was visible in a screenshot, chat, repository or ticket, revoke it and generate a replacement. Do not commit keys. Do not paste a live key into `.env.example`.
+
+#### Location Retrieval
+
+The backend identifies the device with its normalized E.164 MSISDN (`device.phoneNumber`). The normalized result includes latitude, longitude, accuracy radius, area type, observation time and retrieval time. Do not treat this as a GPS fix.
+
+#### Device Reachability
+
+The backend normalizes Nokia `reachable` plus optional `connectivity` (`data` / `sms`) and a checked timestamp. A subscription-management response is **not** current reachability state.
+
+#### Cache and refresh
+
+`GET /api/network-health/summary` and `GET /api/network-health/devices` read stored latest snapshots. `POST /api/network-health/devices/{asset_id}/refresh` and bounded `POST /api/network-health/refresh` call the injected provider unless a snapshot is still inside `NOKIA_NETWORK_CACHE_SECONDS` (override with `force=true`). Bulk refresh is concurrency-limited and may return partial success.
+
+#### Persistence
+
+`0013_device_network` adds `device_network_snapshots` (`DNS-000001`). It does not modify `agent_audit_events` or historical `NETEVT-*` records. Historical Network Agent logs remain available at the compatibility event endpoints; they are not shown as current device health.
+
+#### APIs
+
+- `GET /api/network-health/summary` — latest device-network counts
+- `GET /api/network-health/devices` — latest snapshot per device
+- `GET /api/network-health/devices/{asset_id}` — device network details
+- `GET /api/network-health/devices/{asset_id}/history` — snapshot history
+- `POST /api/network-health/devices/{asset_id}/refresh` — safe backend refresh
+- `POST /api/network-health/refresh` — bounded bulk refresh
+- `GET /api/incidents/{incident_id}/device-network` — stored context for the affected device
+- `POST /api/incidents/{incident_id}/device-network/refresh` — refresh that device only
+- `GET /api/network-health/events` — historical Network Agent audit compatibility
+- `GET /api/network-health/events/{event_id}` — historical event detail
+
+Incident list location continues to use the mapped asset / segment / zone stored in AquaPulse. Nokia refresh does not rewrite incident locations.
+
+### Agent-Native Unified Audit Trail (Step 12)
+
+AquaPulse stores, maps, displays and enforces safety around agent outputs. It does **not** confirm anomalies, classify instrument faults, calculate final confidence or severity, decide QoD/CAMARA actions, choose a Response Agent decision, or decide valve isolation. The Network Health page is no longer an agent log view.
 
 Existing deterministic detection is the lightweight screening model. Its priority is labelled **Screening priority**. Investigation Agent classification, severity, confidence and justification are shown separately when a finding is mapped. Findings never automatically promote a detection, create an incident, change detection status, or trigger the Response Agent.
 
@@ -893,9 +988,6 @@ The Response Agent graph is stored exactly as reported: `reachability_check → 
 
 #### Read-only APIs
 
-- `GET /api/network-health/summary`
-- `GET /api/network-health/events`
-- `GET /api/network-health/events/{event_id}`
 - `GET /api/agent-audit/summary`
 - `GET /api/agent-audit/runs`
 - `GET /api/agent-audit/runs/{run_id}`
@@ -904,7 +996,7 @@ The Response Agent graph is stored exactly as reported: `reachability_check → 
 
 List endpoints omit large raw payloads. Detail endpoints return sanitized structured payloads. Secrets, tokens, raw MSISDNs, operator contacts, local paths and internal URLs are redacted. `reasoning_trace` is only agent-provided text, labelled unverified.
 
-Feature flags remain disabled. No public POST/PATCH/DELETE endpoints were added.
+Agent feature flags remain disabled. Device Network Health refresh endpoints do not execute agents.
 
 ## 7. Starting FastAPI
 
@@ -1062,7 +1154,7 @@ Frontend routes:
 - `/detections` — Investigation Queue
 - `/detections/:detectionId` — Detection Details
 - `/integrations` — Integration Readiness
-- `/network` and `/network-health` — Mock Network Agent logs
+- `/network` and `/network-health` — Device network health (demonstration / simulator data)
 - `/agent-audit` — Unified Agent Audit Trail
 - `/agent-audit/runs/:runId` — Agent audit run details
 - `/agents` — AI Agents placeholder (not the integration gateway)

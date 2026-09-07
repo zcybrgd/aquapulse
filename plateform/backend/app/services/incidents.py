@@ -171,7 +171,13 @@ class IncidentService:
         critical = [row for row in active if row.severity_tier == 3]
         water_loss = sum(row.estimated_water_loss_m3 for row in active)
         awaiting = len([row for row in active if row.status == IncidentStatus.awaiting_approval.value])
-        responding = len([row for row in active if row.status == IncidentStatus.responding.value])
+        responding = len(
+            [
+                row
+                for row in active
+                if row.status == IncidentStatus.investigating.value and row.response_started_at is not None
+            ]
+        )
         return len(active), len(critical), round(water_loss, 1), awaiting, responding
 
     def _load(self, incident_id: str) -> Incident:

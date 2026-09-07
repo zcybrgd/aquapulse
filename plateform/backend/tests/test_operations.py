@@ -26,12 +26,13 @@ def _session():
 def test_acknowledge_assign_and_note(client, test_database) -> None:
     first = client.post("/api/incidents/INC-1838/acknowledge", json={**ACTOR, "note": "Control room ack."})
     assert first.status_code == 200
-    assert first.json()["status"] == "acknowledged"
+    assert first.json()["status"] == "investigating"
     assert first.json()["acknowledged_by"] == "Demo Operator"
+    assert first.json()["acknowledged_at"]
 
     repeat = client.post("/api/incidents/INC-1838/acknowledge", json=ACTOR)
     assert repeat.status_code == 200
-    assert repeat.json()["status"] == "acknowledged"
+    assert repeat.json()["status"] == "investigating"
 
     assigned = client.post(
         "/api/incidents/INC-1838/assign",
@@ -39,26 +40,22 @@ def test_acknowledge_assign_and_note(client, test_database) -> None:
     )
     assert assigned.status_code == 200
     assert assigned.json()["assigned_to"] == "Harbour Response Team"
+    assert assigned.json()["status"] == "investigating"
 
     note = client.post("/api/incidents/INC-1838/notes", json={**ACTOR, "note": "No status change expected."})
     assert note.status_code == 200
-    assert note.json()["status"] == "acknowledged"
+    assert note.json()["status"] == "investigating"
     _restore()
 
 
 def test_valid_and_invalid_incident_transitions(client, test_database) -> None:
-    assert client.post("/api/incidents/INC-1838/start-investigation", json=ACTOR).status_code == 409
-    assert client.post("/api/incidents/INC-1838/start-response", json=ACTOR).status_code == 409
-    assert client.post("/api/incidents/INC-1838/resolve", json={
-        **ACTOR,
-        "resolution_code": "other",
-        "resolution_summary": "Too early.",
-    }).status_code == 409
-
-    client.post("/api/incidents/INC-1838/acknowledge", json=ACTOR)
     started = client.post("/api/incidents/INC-1838/start-investigation", json=ACTOR)
     assert started.status_code == 200
     assert started.json()["status"] == "investigating"
+
+    blocked_response = client.post("/api/incidents/INC-1838/start-response", json=ACTOR)
+    assert blocked_response.status_code == 409
+    assert blocked_response.json()["detail"]["code"] == "incident_assignment_required"
 
     approval = client.post("/api/incidents/INC-1838/request-approval", json=ACTOR)
     assert approval.status_code == 200
@@ -71,12 +68,8 @@ def test_valid_and_invalid_incident_transitions(client, test_database) -> None:
     client.post("/api/incidents/INC-1838/assign", json={**ACTOR, "assigned_to": "Demo Operator"})
     responding = client.post("/api/incidents/INC-1838/start-response", json=ACTOR)
     assert responding.status_code == 200
-    assert responding.json()["status"] == "responding"
-
-    assert client.post("/api/incidents/INC-1838/false-alarm", json={
-        **ACTOR,
-        "resolution_summary": "Not allowed from responding.",
-    }).status_code == 409
+    assert responding.json()["status"] == "investigating"
+    assert responding.json()["response_started_at"]
 
     resolved = client.post(
         "/api/incidents/INC-1838/resolve",
@@ -88,8 +81,16 @@ def test_valid_and_invalid_incident_transitions(client, test_database) -> None:
     assert client.post("/api/incidents/INC-1838/notes", json={**ACTOR, "note": "Closed."}).status_code == 409
     reopened = client.post("/api/incidents/INC-1838/reopen", json={**ACTOR, "note": "New telemetry."})
     assert reopened.status_code == 200
-    assert reopened.json()["status"] == "open"
+    assert reopened.json()["status"] == "investigating"
     assert reopened.json()["resolution_code"] is None
+    _restore()
+
+
+def test_approve_and_start_response_from_waiting(client, test_database) -> None:
+    started = client.post("/api/incidents/INC-1835/start-response", json=ACTOR)
+    assert started.status_code == 200
+    assert started.json()["status"] == "investigating"
+    assert started.json()["response_started_at"]
     _restore()
 
 
@@ -105,8 +106,11 @@ def test_false_alarm_and_resolution_requirements(client, test_database) -> None:
         json={**ACTOR, "resolution_summary": "Sensor noise, not a leak. History is retained."},
     )
     assert marked.status_code == 200
-    assert marked.json()["status"] == "false_alarm"
+    assert marked.json()["status"] == "resolved"
     assert marked.json()["resolution_code"] == "false_alarm"
+
+    timeline = client.get("/api/incidents/INC-1833/timeline").json()["events"]
+    assert timeline[-1]["event_type"] == "incident_false_alarm"
 
     already = client.post(
         "/api/incidents/INC-1834/resolve",
@@ -118,8 +122,6 @@ def test_false_alarm_and_resolution_requirements(client, test_database) -> None:
 
 
 def test_start_response_requires_assignment(client, test_database) -> None:
-    client.post("/api/incidents/INC-1838/acknowledge", json=ACTOR)
-    client.post("/api/incidents/INC-1838/start-investigation", json=ACTOR)
     blocked = client.post("/api/incidents/INC-1838/start-response", json=ACTOR)
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["code"] == "incident_assignment_required"
@@ -182,13 +184,19 @@ def test_response_task_lifecycle_and_invalid_transitions(client, test_database) 
     _restore()
 
 
-def test_tasks_rejected_outside_responding(client, test_database) -> None:
+def test_tasks_rejected_until_response_started(client, test_database) -> None:
     blocked = client.post(
         "/api/incidents/INC-1838/tasks",
         json={**ACTOR, "title": "Should not exist"},
     )
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["code"] == "invalid_incident_transition"
+
+    awaiting = client.post(
+        "/api/incidents/INC-1835/tasks",
+        json={**ACTOR, "title": "Should not exist while waiting"},
+    )
+    assert awaiting.status_code == 409
 
 
 def test_resolve_with_incomplete_tasks(client, test_database) -> None:
@@ -277,17 +285,23 @@ def test_seed_idempotency_keeps_incident_count(client, test_database) -> None:
     assert first.incidents == second.incidents == 9
     session = _session()
     try:
-        statuses = {
-            row.incident_number: row.status
-            for row in session.scalars(select(Incident)).all()
-        }
+        rows = list(session.scalars(select(Incident)).all())
+        statuses = {row.incident_number: row.status for row in rows}
+        codes = {row.incident_number: row.resolution_code for row in rows}
+        ack = {row.incident_number: row.acknowledged_at for row in rows}
+        started = {row.incident_number: row.response_started_at for row in rows}
     finally:
         session.close()
-    assert statuses["INC-1838"] == "open"
-    assert statuses["INC-1836"] == "acknowledged"
+    assert set(statuses.values()) <= {"investigating", "awaiting_approval", "resolved"}
+    assert statuses["INC-1838"] == "investigating"
+    assert statuses["INC-1836"] == "investigating"
+    assert ack["INC-1836"] is not None
     assert statuses["INC-1835"] == "awaiting_approval"
-    assert statuses["INC-1842"] == "responding"
+    assert statuses["INC-1842"] == "investigating"
+    assert started["INC-1842"] is not None
     assert statuses["INC-1834"] == "resolved"
+    assert statuses["INC-1837"] == "resolved"
+    assert codes["INC-1837"] == "false_alarm"
 
 
 def test_promoted_detection_uses_operations_workflow(client, test_database) -> None:
@@ -306,6 +320,7 @@ def test_promoted_detection_uses_operations_workflow(client, test_database) -> N
     )
     assert promoted.status_code == 200
     incident_id = promoted.json()["incident"]["id"]
+    assert promoted.json()["incident"]["status"] == "investigating"
     ops = client.get(f"/api/incidents/{incident_id}/operations")
     assert ops.status_code == 200
     assert ops.json()["status"] == "investigating"
@@ -317,7 +332,7 @@ def test_promoted_detection_uses_operations_workflow(client, test_database) -> N
     _restore()
 
 
-def test_concurrent_start_response_protection(client, test_database) -> None:
+def test_concurrent_start_response_is_idempotent(client, test_database) -> None:
     results: list[int] = []
 
     def worker() -> None:
@@ -330,5 +345,8 @@ def test_concurrent_start_response_protection(client, test_database) -> None:
     second.start()
     first.join()
     second.join()
-    assert sorted(results) == [200, 409]
+    assert sorted(results) == [200, 200]
+    ops = client.get("/api/incidents/INC-1841/operations")
+    assert ops.json()["status"] == "investigating"
+    assert ops.json()["response_started_at"]
     _restore()

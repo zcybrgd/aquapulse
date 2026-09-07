@@ -176,6 +176,13 @@ class MaintenanceConflictError(Exception):
         return {"message": self.message, "code": self.code, **self.extra}
 
 
+class DeviceNetworkProviderError(Exception):
+    def __init__(self, message: str, *, code: str) -> None:
+        self.message = message
+        self.code = code
+        super().__init__(message)
+
+
 class NetworkEventNotFoundError(Exception):
     def __init__(self, event_id: str) -> None:
         self.event_id = event_id

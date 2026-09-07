@@ -10,14 +10,9 @@ export type IncidentClassification =
   | "insufficient_data";
 
 export type IncidentStatus =
-  | "open"
-  | "acknowledged"
   | "investigating"
   | "awaiting_approval"
-  | "responding"
-  | "monitoring"
-  | "resolved"
-  | "false_alarm";
+  | "resolved";
 
 export type ResolutionCode =
   | "leak_repaired"
@@ -37,7 +32,6 @@ export type IncidentSortField =
   | "detected_at"
   | "severity"
   | "status"
-  | "estimated_loss"
   | "priority";
 
 export type SortOrder = "asc" | "desc";

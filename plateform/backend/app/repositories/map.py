@@ -12,7 +12,6 @@ from app.services.incidents import ACTIVE_STATUSES
 
 EXCLUDED_INCIDENT_STATUSES = {
     IncidentStatus.resolved.value,
-    IncidentStatus.false_alarm.value,
 }
 
 

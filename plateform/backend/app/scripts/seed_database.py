@@ -28,6 +28,7 @@ from app.db.session import get_session_factory
 from app.schemas.incidents import IncidentDetail
 from app.scripts.seed_integrations import seed_integrations
 from app.scripts.seed_maintenance import seed_maintenance_demo
+from app.scripts.seed_device_network import seed_device_network
 from app.scripts.seed_network_audit import seed_network_audit
 from app.scripts.seed_investigation import seed_investigation_demo
 from app.scripts.seed_operations import seed_operations_demo
@@ -130,6 +131,7 @@ class SeedSummary:
     maintenance_plans: int
     maintenance_work_orders: int
     network_events: int
+    device_network_snapshots: int
     agent_audit_events: int
     mock_agent_runs: int
     investigation_findings: int
@@ -285,21 +287,21 @@ def _upsert_incident(
         "acknowledged_at": None,
         "acknowledged_by": None,
         "response_started_at": None,
-        "resolved_at": source.updated_at if source.status.value in {"resolved", "false_alarm"} else None,
+        "resolved_at": source.updated_at if source.status.value == "resolved" else None,
         "resolved_by": (
             source.assigned_operator or "Seed Operator"
-            if source.status.value in {"resolved", "false_alarm"}
+            if source.status.value == "resolved"
             else None
         ),
         "resolution_code": (
             "false_alarm"
-            if source.status.value == "false_alarm"
+            if source.incident_number == "INC-1837"
             else "other"
             if source.status.value == "resolved"
             else None
         ),
         "resolution_summary": (
-            source.current_summary if source.status.value in {"resolved", "false_alarm"} else None
+            source.current_summary if source.status.value == "resolved" else None
         ),
         "agent_investigation_summary": source.agent_investigation_summary,
         "recommended_action": source.recommended_action,
@@ -438,6 +440,7 @@ def seed_database(session: Session | None = None) -> SeedSummary:
         seed_integrations(db)
         seed_maintenance_demo(db)
         network_audit = seed_network_audit(db)
+        device_network = seed_device_network(db)
 
         db.commit()
         summary = SeedSummary(
@@ -460,6 +463,7 @@ def seed_database(session: Session | None = None) -> SeedSummary:
             maintenance_plans=db.scalar(select(func.count()).select_from(MaintenancePlan)) or 0,
             maintenance_work_orders=db.scalar(select(func.count()).select_from(MaintenanceWorkOrder)) or 0,
             network_events=network_audit.get("network_events", 0),
+            device_network_snapshots=device_network["snapshots"],
             agent_audit_events=network_audit["events"],
             mock_agent_runs=network_audit["runs"],
             investigation_findings=network_audit.get("findings", 0),
@@ -488,6 +492,7 @@ def print_summary(summary: SeedSummary) -> None:
     print(f"  mock agent runs: {summary.mock_agent_runs}")
     print(f"  investigation findings: {summary.investigation_findings}")
     print(f"  network draft events: {summary.network_events}")
+    print(f"  device network snapshots: {summary.device_network_snapshots}")
     print(f"  agent audit events: {summary.agent_audit_events}")
 
 

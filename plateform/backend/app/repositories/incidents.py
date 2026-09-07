@@ -15,14 +15,9 @@ CLASSIFICATION_LABELS = {
 }
 
 STATUS_SQL = case(
-    (Incident.status == IncidentStatus.awaiting_approval.value, 8),
-    (Incident.status == IncidentStatus.responding.value, 7),
-    (Incident.status == IncidentStatus.investigating.value, 6),
-    (Incident.status == IncidentStatus.acknowledged.value, 5),
-    (Incident.status == IncidentStatus.open.value, 4),
-    (Incident.status == IncidentStatus.monitoring.value, 3),
-    (Incident.status == IncidentStatus.resolved.value, 2),
-    (Incident.status == IncidentStatus.false_alarm.value, 1),
+    (Incident.status == IncidentStatus.awaiting_approval.value, 3),
+    (Incident.status == IncidentStatus.investigating.value, 2),
+    (Incident.status == IncidentStatus.resolved.value, 1),
     else_=0,
 )
 

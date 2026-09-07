@@ -15,18 +15,18 @@ export function MaintenanceTable({ items }: { items: WorkOrderSummary[] }) {
   const location = useLocation();
 
   return (
-    <Card className="hidden min-w-0 overflow-hidden xl:block">
-      <table className="w-full table-fixed border-collapse text-left text-sm">
+    <Card className="hidden min-w-0 overflow-x-auto xl:block">
+      <table className="w-full min-w-[56rem] border-collapse text-left text-sm">
         <thead className="bg-page text-xs font-medium uppercase tracking-wide text-ink-muted">
           <tr>
-            <th className="w-[22%] px-4 py-3">Work order</th>
-            <th className="w-[10%] px-4 py-3">Due</th>
-            <th className="w-[16%] px-4 py-3">Asset</th>
-            <th className="w-[12%] px-4 py-3">Zone</th>
-            <th className="w-[12%] px-4 py-3">Type</th>
-            <th className="w-[12%] px-4 py-3">Assignment</th>
-            <th className="w-[10%] px-4 py-3">Status</th>
-            <th className="w-[6%] px-4 py-3">Action</th>
+            <th className="min-w-[11rem] px-4 py-3">Work order</th>
+            <th className="whitespace-nowrap px-4 py-3">Due</th>
+            <th className="min-w-[8rem] px-4 py-3">Asset</th>
+            <th className="px-4 py-3">Zone</th>
+            <th className="px-4 py-3">Type</th>
+            <th className="px-4 py-3">Assignment</th>
+            <th className="whitespace-nowrap px-4 py-3">Status</th>
+            <th className="sticky right-0 z-10 whitespace-nowrap bg-page px-4 py-3">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -60,10 +60,14 @@ export function MaintenanceTable({ items }: { items: WorkOrderSummary[] }) {
                 {MAINTENANCE_TYPE_LABELS[item.maintenance_type]}
               </td>
               <td className="px-4 py-3 align-top text-ink-muted">{item.assigned_to ?? "Unassigned"}</td>
-              <td className="px-4 py-3 align-top">
+              <td className="whitespace-nowrap px-4 py-3 align-top">
                 <WorkOrderStatusBadge status={item.status} />
               </td>
-              <td className="px-4 py-3 align-top">
+              <td
+                className={`sticky right-0 z-10 whitespace-nowrap px-4 py-3 align-top ${
+                  item.overdue ? "bg-critical/5" : "bg-white"
+                }`}
+              >
                 <Link
                   to={detailsPath(item.public_id, location.search)}
                   className="text-sm font-medium text-teal hover:underline"

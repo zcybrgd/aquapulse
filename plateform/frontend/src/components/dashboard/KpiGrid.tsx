@@ -1,4 +1,4 @@
-import { Activity, Droplets, Radio, Timer, TriangleAlert } from "lucide-react";
+import { Activity, Radio, Timer, TriangleAlert } from "lucide-react";
 
 import type { DashboardSummary } from "../../types/api";
 import { formatNumber, formatPercent } from "../../lib/format";
@@ -16,7 +16,7 @@ export function KpiGrid({ summary }: KpiGridProps) {
       <KpiCard
         label="Active incidents"
         value={formatNumber(summary.active_incidents)}
-        context={`${summary.critical_incidents} critical · ${summary.awaiting_approval ?? 0} awaiting approval · ${summary.responding ?? 0} responding`}
+        context={`${summary.critical_incidents} critical · ${summary.awaiting_approval ?? 0} waiting for approval · ${summary.responding ?? 0} response in progress`}
         icon={TriangleAlert}
         tone={summary.critical_incidents > 0 ? "critical" : "default"}
         delay={0.02}
@@ -36,18 +36,11 @@ export function KpiGrid({ summary }: KpiGridProps) {
         delay={0.1}
       />
       <KpiCard
-        label="Estimated water loss"
-        value={`${formatNumber(summary.estimated_water_loss_m3, 1)} m³`}
-        context="Last 24 hours"
-        icon={Droplets}
-        delay={0.14}
-      />
-      <KpiCard
         label="Average response time"
         value={`${formatNumber(summary.average_response_time_min, 1)} min`}
         context="Target under 15 min"
         icon={Timer}
-        delay={0.18}
+        delay={0.14}
       />
     </div>
   );

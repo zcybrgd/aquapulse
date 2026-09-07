@@ -1,14 +1,28 @@
 """Incident operations transition table. No I/O.
 
-Legacy `monitoring` remains a valid active status so seeded incidents are not
-forced into a new value. `acknowledged` is the Step 9 insertion between
-`open` and `investigating`.
+Current incident statuses are investigating, awaiting_approval, and resolved.
+Acknowledgement, response start, and false-alarm are metadata or resolution
+codes, not statuses.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
+LEGACY_INCIDENT_STATUS_MAP = {
+    "open": "investigating",
+    "acknowledged": "investigating",
+    "investigating": "investigating",
+    "responding": "investigating",
+    "monitoring": "investigating",
+    "awaiting_approval": "awaiting_approval",
+    "resolved": "resolved",
+    "false_alarm": "resolved",
+}
+
 ACTION_MAP: dict[str, tuple[str, ...]] = {
-    "open": ("acknowledge", "assign", "add_note"),
-    "acknowledged": ("assign", "start_investigation", "add_note"),
     "investigating": (
+        "acknowledge",
         "assign",
         "add_note",
         "request_approval",
@@ -16,33 +30,30 @@ ACTION_MAP: dict[str, tuple[str, ...]] = {
         "resolve",
         "false_alarm",
     ),
-    "awaiting_approval": ("assign", "add_note", "start_response", "return_investigation"),
-    "responding": ("assign", "add_note", "manage_tasks", "resolve"),
-    "monitoring": ("assign", "add_note", "start_response", "resolve", "false_alarm"),
+    "awaiting_approval": (
+        "assign",
+        "add_note",
+        "start_investigation",
+        "return_investigation",
+        "start_response",
+        "resolve",
+        "false_alarm",
+    ),
     "resolved": ("reopen",),
-    "false_alarm": ("reopen",),
 }
 
-ACTIVE_STATUSES = {
-    "open",
-    "acknowledged",
-    "investigating",
-    "awaiting_approval",
-    "responding",
-    "monitoring",
-}
-TERMINAL_STATUSES = {"resolved", "false_alarm"}
+ACTIVE_STATUSES = {"investigating", "awaiting_approval"}
+TERMINAL_STATUSES = {"resolved"}
 NOTE_STATUSES = ACTIVE_STATUSES
 ASSIGN_STATUSES = ACTIVE_STATUSES
-ACKNOWLEDGE_STATUSES = {"open"}
-START_INVESTIGATION_STATUSES = {"acknowledged"}
+ACKNOWLEDGE_STATUSES = {"investigating"}
+START_INVESTIGATION_STATUSES = {"investigating", "awaiting_approval"}
 RETURN_INVESTIGATION_STATUSES = {"awaiting_approval"}
 REQUEST_APPROVAL_STATUSES = {"investigating"}
-START_RESPONSE_STATUSES = {"investigating", "awaiting_approval", "monitoring"}
-RESOLVE_STATUSES = {"investigating", "responding", "monitoring"}
-FALSE_ALARM_STATUSES = {"investigating", "monitoring"}
+START_RESPONSE_STATUSES = ACTIVE_STATUSES
+RESOLVE_STATUSES = ACTIVE_STATUSES
+FALSE_ALARM_STATUSES = ACTIVE_STATUSES
 REOPEN_STATUSES = TERMINAL_STATUSES
-TASK_MANAGE_STATUSES = {"responding"}
 
 RESOLUTION_CODES = (
     "leak_repaired",
@@ -61,3 +72,11 @@ OPEN_TASK_STATUSES = {"todo", "in_progress"}
 
 def allowed_actions(status: str) -> list[str]:
     return list(ACTION_MAP.get(status, ()))
+
+
+def can_manage_tasks(incident: Any) -> bool:
+    return incident.status == "investigating" and incident.response_started_at is not None
+
+
+def migrate_incident_status(status: str) -> str:
+    return LEGACY_INCIDENT_STATUS_MAP.get(status, status)

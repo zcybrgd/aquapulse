@@ -12,6 +12,7 @@ from app.db.models.organization import Organization
 from app.db.models.response_task import IncidentResponseTask
 from app.db.models.pipeline import PipelineSegment
 from app.db.models.sensor_reading import SensorReading
+from app.db.models.device_network import DeviceNetworkSnapshot
 from app.db.models.agent_audit import AgentAuditEvent
 from app.db.models.integration import (
     AgentFinding,
@@ -34,6 +35,7 @@ __all__ = [
     "DetectionEvidence",
     "DetectionInvestigationEvent",
     "DetectionRule",
+    "DeviceNetworkSnapshot",
     "Incident",
     "MaintenancePlan",
     "MaintenanceWorkOrder",

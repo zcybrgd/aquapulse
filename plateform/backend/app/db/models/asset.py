@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.db.models.incident import Incident
     from app.db.models.organization import Organization
     from app.db.models.pipeline import PipelineSegment
+    from app.db.models.device_network import DeviceNetworkSnapshot
     from app.db.models.maintenance import MaintenancePlan, MaintenanceWorkOrder
     from app.db.models.zone import Zone
 
@@ -132,3 +133,4 @@ class Asset(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     anomaly_detections: Mapped[list[AnomalyDetection]] = relationship(back_populates="sensor")
     maintenance_plans: Mapped[list[MaintenancePlan]] = relationship(back_populates="asset")
     maintenance_work_orders: Mapped[list[MaintenanceWorkOrder]] = relationship(back_populates="asset")
+    network_snapshots: Mapped[list[DeviceNetworkSnapshot]] = relationship(back_populates="asset")

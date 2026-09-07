@@ -6,6 +6,7 @@ import { IncidentDetailHeader } from "../components/incidents/IncidentDetailHead
 import { IncidentDetailSkeleton } from "../components/incidents/IncidentDetailSkeleton";
 import { IncidentEvidenceList } from "../components/incidents/IncidentEvidenceList";
 import { IncidentLocationPanel } from "../components/incidents/IncidentLocationPanel";
+import { IncidentDeviceNetworkContext } from "../components/incidents/IncidentDeviceNetworkContext";
 import { IncidentNetworkPanel } from "../components/incidents/IncidentNetworkPanel";
 import { IncidentOperationsPanel } from "../components/incidents/IncidentOperationsPanel";
 import { IncidentRelatedMaintenance } from "../components/incidents/IncidentRelatedMaintenance";
@@ -62,6 +63,7 @@ export function IncidentDetailPage() {
             <div className="flex min-w-0 flex-col gap-4">
               <IncidentLocationPanel incident={incident} />
               <IncidentNetworkPanel incident={incident} />
+              <IncidentDeviceNetworkContext incidentId={incident.id} />
               <IncidentEvidenceList evidence={incident.evidence} />
               <IncidentRelatedMaintenance incidentId={incident.id} />
               {operations.operations ? (

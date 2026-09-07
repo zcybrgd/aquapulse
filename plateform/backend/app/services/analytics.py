@@ -384,7 +384,15 @@ class AnalyticsService:
                 )
             ],
             by_status=[
-                NamedCount(key=key, label=key.replace("_", " ").title(), count=count)
+                NamedCount(
+                    key=key,
+                    label={
+                        "investigating": "Investigating",
+                        "awaiting_approval": "Waiting for approval",
+                        "resolved": "Resolved",
+                    }.get(key, key.replace("_", " ").title()),
+                    count=count,
+                )
                 for key, count in self.repository.incidents_grouped(
                     Incident.status, start=start, end=end, zone=zone, sensor=sensor
                 )
