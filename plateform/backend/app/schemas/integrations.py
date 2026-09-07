@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -115,7 +115,17 @@ class AgentFindingRecord(BaseModel):
     criticality_metrics: dict[str, Any]
     operator_justification: str | None = None
     advisory: bool = True
+    data_mode: str = "simulated"
     created_at: datetime
+
+
+class AgentIngestAccepted(BaseModel):
+    status: Literal["accepted"] = "accepted"
+    agent: str
+    run_id: str
+    created: int
+    duplicates: int
+    unmapped_ids: list[str] = Field(default_factory=list)
 
 
 class AgentRecommendationRecord(BaseModel):

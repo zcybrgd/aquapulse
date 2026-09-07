@@ -85,6 +85,7 @@ export interface AgentFindingRecord {
   criticality_metrics: Record<string, unknown>;
   operator_justification: string | null;
   advisory: boolean;
+  data_mode?: string;
   created_at: string;
 }
 

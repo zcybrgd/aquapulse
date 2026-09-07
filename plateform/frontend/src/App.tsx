@@ -12,6 +12,7 @@ import { AgentAuditPage } from "./pages/AgentAuditPage";
 import { AgentAuditRunPage } from "./pages/AgentAuditRunPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { NetworkHealthPage } from "./pages/NetworkHealthPage";
+import { PipelineLabPage } from "./pages/PipelineLabPage";
 import {
   IntegrationFindingPage,
   IntegrationRecommendationPage,
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
         <Route path="/operations" element={<OperationsPage />} />
         <Route path="/detections" element={<DetectionsPage />} />
+        <Route path="/detections/findings/:findingId" element={<IntegrationFindingPage />} />
         <Route path="/detections/:detectionId" element={<DetectionDetailPage />} />
         <Route path="/assets" element={<AssetsPage />} />
         <Route path="/assets/:assetId" element={<AssetDetailPage />} />
@@ -67,6 +69,8 @@ export default function App() {
         />
         <Route path="/network" element={<NetworkHealthPage />} />
         <Route path="/network-health" element={<NetworkHealthPage />} />
+        <Route path="/pipeline-lab" element={<PipelineLabPage />} />
+        <Route path="/testbed" element={<PipelineLabPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/agent-audit" element={<AgentAuditPage />} />
         <Route path="/agent-audit/runs/:runId" element={<AgentAuditRunPage />} />

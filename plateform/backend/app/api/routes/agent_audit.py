@@ -3,7 +3,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_agent_audit_service
-from app.network.constants import MOCK_DATA_MODE
 from app.schemas.agent_audit import (
     AgentAuditEventDetail,
     AgentAuditEventListResponse,
@@ -25,7 +24,7 @@ def get_agent_audit_summary(
     detection: str | None = Query(default=None),
     device: str | None = Query(default=None),
     cluster: str | None = Query(default=None),
-    data_mode: str | None = Query(default=MOCK_DATA_MODE),
+    data_mode: str | None = Query(default=None),
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     search: str | None = Query(default=None),
@@ -55,7 +54,7 @@ def list_agent_audit_runs(
     detection: str | None = Query(default=None),
     device: str | None = Query(default=None),
     cluster: str | None = Query(default=None),
-    data_mode: str | None = Query(default=MOCK_DATA_MODE),
+    data_mode: str | None = Query(default=None),
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     search: str | None = Query(default=None),
@@ -99,7 +98,7 @@ def list_agent_audit_events(
     detection: str | None = Query(default=None),
     device: str | None = Query(default=None),
     cluster: str | None = Query(default=None),
-    data_mode: str | None = Query(default=MOCK_DATA_MODE),
+    data_mode: str | None = Query(default=None),
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     search: str | None = Query(default=None),

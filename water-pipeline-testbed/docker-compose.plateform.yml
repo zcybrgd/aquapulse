@@ -1,0 +1,7 @@
+# Use beside AquaPulse plateform so the simulator does not take host port 8000.
+# Compose merges `ports` lists unless overridden, so the base 8000 mapping must be replaced.
+# docker compose -f docker-compose.yml -f docker-compose.plateform.yml up --build
+services:
+  simulator:
+    ports: !override
+      - "8002:8000"

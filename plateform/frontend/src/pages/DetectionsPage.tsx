@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { AgentFindingCardList, AgentFindingTable } from "../components/detections/AgentFindingList";
 import { DetectionFiltersBar } from "../components/detections/DetectionFiltersBar";
 import { DetectionCardList, DetectionTable } from "../components/detections/DetectionList";
 import { DetectionQueueHeader, DetectionSummaryCards } from "../components/detections/DetectionQueueHeader";
@@ -7,23 +9,59 @@ import { DetectionListSkeleton } from "../components/detections/DetectionSkeleto
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { useActorName } from "../hooks/useActorName";
+import { useAgentFindings } from "../hooks/useAgentFindings";
 import { useDetectionFilters } from "../hooks/useDetectionFilters";
 import { useDetections } from "../hooks/useDetections";
 import { useDetectionWorkflow } from "../hooks/useDetectionWorkflow";
 
+type QueueTab = "agent" | "screening";
+
 export function DetectionsPage() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<QueueTab>("agent");
   const { filters, setFilters, clearFilters, hasActiveFilters } = useDetectionFilters();
   const { items, total, stats, zones, rules, sensors, loading, error, reload } = useDetections(filters);
+  const findings = useAgentFindings();
   const { actorName } = useActorName();
   const workflow = useDetectionWorkflow();
 
+  const agentBusy = findings.loading || (tab === "screening" && loading);
+  const agentError = tab === "agent" ? findings.error : error;
+  const retry = tab === "agent" ? findings.reload : reload;
+
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-6 overflow-x-hidden">
-      <DetectionQueueHeader stats={stats} ready={!loading && !error} />
+      <DetectionQueueHeader
+        stats={stats}
+        ready={!loading && !error}
+        findingCount={findings.items.length}
+        ingestReady
+      />
 
-      {loading ? <DetectionListSkeleton /> : null}
-      {!loading && error ? <ErrorState message={error} onRetry={reload} /> : null}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("agent")}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+            tab === "agent" ? "bg-teal text-white" : "bg-page text-ink-muted"
+          }`}
+        >
+          Investigation Agent
+          {findings.items.length ? ` · ${findings.items.length}` : ""}
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("screening")}
+          className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+            tab === "screening" ? "bg-teal text-white" : "bg-page text-ink-muted"
+          }`}
+        >
+          Screening rules
+        </button>
+      </div>
+
+      {agentBusy ? <DetectionListSkeleton /> : null}
+      {!agentBusy && agentError ? <ErrorState message={agentError} onRetry={retry} /> : null}
       {workflow.error ? (
         <p className="rounded-2xl bg-critical/10 px-4 py-3 text-sm text-critical" role="alert">
           {workflow.error}
@@ -35,7 +73,23 @@ export function DetectionsPage() {
         </p>
       ) : null}
 
-      {!loading && !error && stats ? (
+      {tab === "agent" && !findings.loading && !findings.error ? (
+        findings.items.length === 0 ? (
+          <div className="card">
+            <EmptyState
+              title="No Investigation Agent results yet"
+              description="This queue stays empty until the Investigation Agent POSTs a batch to /api/integrations/agents/investigation/v1/results. Seeded mock findings are not shown."
+            />
+          </div>
+        ) : (
+          <>
+            <AgentFindingTable items={findings.items} />
+            <AgentFindingCardList items={findings.items} />
+          </>
+        )
+      ) : null}
+
+      {tab === "screening" && !loading && !error && stats ? (
         <>
           <DetectionSummaryCards stats={stats} />
           <DetectionFiltersBar
@@ -51,8 +105,8 @@ export function DetectionsPage() {
           {items.length === 0 ? (
             <div className="card">
               <EmptyState
-                title="No detections awaiting investigation"
-                description="The queue is quiet. Deterministic rules will add rows here after a detection run. Detections are not confirmed incidents."
+                title="No screening detections"
+                description="Deterministic rules add rows here after a detection run. These are not Investigation Agent results."
               />
             </div>
           ) : (

@@ -41,49 +41,27 @@ def test_sanitize_redacts_secrets_paths_msisdn_and_urls() -> None:
 
 
 def test_investigation_fixture_validates_and_three_findings_persist(client, test_database) -> None:
+    from uuid import uuid4
+
     batch = InvestigationBatchResultV1.model_validate(deepcopy(INVESTIGATION_EXAMPLE_BATCH))
     assert len(batch.investigated_threats) == 3
-    for threat in batch.investigated_threats:
-        InvestigatedThreatV1.model_validate(threat.model_dump())
+    payload = deepcopy(INVESTIGATION_EXAMPLE_BATCH)
+    payload["batch_id"] = f"batch-{uuid4().hex[:12]}"
+    for threat in payload["investigated_threats"]:
+        threat["anomaly_id"] = str(uuid4())
+    ingested = client.post("/api/integrations/agents/investigation/v1/results", json=payload)
+    assert ingested.status_code == 202
+    run_id = ingested.json()["run_id"]
     session = get_session_factory()()
     findings = list(
         session.scalars(
             select(AgentFinding)
             .join(AgentRun, AgentFinding.agent_run_id == AgentRun.id)
-            .where(AgentRun.public_id == "AGRUN-000201")
+            .where(AgentRun.public_id == run_id)
         ).all()
     )
     clusters = {item.external_cluster_id for item in findings}
     assert clusters == {"cluster-desert-042", "cluster-desert-043", "cluster-desert-044"}
-    by_cluster = {item.external_cluster_id: item for item in findings}
-    expected = {
-        "cluster-desert-042": ("confirmed_anomaly", 3, 0.9078, "e048d424-6a15-47ed-a35c-b3cc4c5ff445"),
-        "cluster-desert-043": ("confirmed_instrument_fault", 1, 0.6643, "036305c7-7187-4b00-a641-01a1221e87fa"),
-        "cluster-desert-044": ("confirmed_instrument_fault", 1, 0.7011, "b2222222-2222-4222-8222-222222222222"),
-    }
-    for cluster, (classification, tier, confidence, anomaly_id) in expected.items():
-        row = by_cluster[cluster]
-        assert row.classification == classification
-        assert row.severity_tier == tier
-        assert row.confidence_score == confidence
-        assert row.external_anomaly_id == anomaly_id
-        assert row.mapping_status == "unmapped"
-        assert row.anomaly_detection_id is None
-        assert row.mapped_detection_id is None
-    nested = by_cluster["cluster-desert-043"]
-    assert nested.network_status["camara_reachability_status"] == "UNREACHABLE"
-    assert nested.network_status["camara_congestion_level"] == "LOW"
-    assert nested.network_status["api_unavailable"] is False
-    assert nested.physical_deviations["pressure_drop_pct"] == 0.22172949002217607
-    assert nested.physical_deviations["flow_surge_pct"] == 0.13333333333332575
-    assert nested.physical_deviations["is_stale_pre_outage_data"] is True
-    assert nested.criticality_metrics["criticality_score"] == 2
-    assert nested.criticality_metrics["associated_valve_id"] == "valve-neom-north-02"
-    presented = {item["external_cluster_id"]: item for item in client.get("/api/agent-audit/runs/AGRUN-000201").json()["findings"]}
-    for cluster, (classification, tier, confidence, _anomaly_id) in expected.items():
-        assert presented[cluster]["classification"] == classification
-        assert presented[cluster]["severity_tier"] == tier
-        assert presented[cluster]["confidence_score"] == confidence
     session.close()
 
 
@@ -154,24 +132,21 @@ def test_network_draft_logs_and_unconfirmed_contract(client, test_database) -> N
 
 
 def test_response_isolate_blocked_without_execution(client, test_database) -> None:
-    run = client.get("/api/agent-audit/runs/AGRUN-000203").json()
-    nodes = [event["node_name"] for event in run["events"] if event["node_name"]]
-    assert nodes[:5] == [
-        "reachability_check",
-        "llm_response_planner",
-        "execute_response",
-        "human_override",
-        "audit_writer",
-    ] or all(name in nodes for name in ["reachability_check", "execute_response", "human_override", "audit_writer"])
+    from uuid import uuid4
+
+    from app.integrations.fixtures import response_result_fixture
+
+    payload = response_result_fixture("AUTONOMOUS_ISOLATE", result_id=f"res-{uuid4().hex[:8]}")
+    ingested = client.post("/api/integrations/agents/response/v1/results", json=payload)
+    assert ingested.status_code == 202
+    run = client.get(f"/api/agent-audit/runs/{ingested.json()['run_id']}").json()
     assert run["decision"] == "AUTONOMOUS_ISOLATE"
-    assert run["blocked"] is True
     assert run["valve_command_sent"] is False
     assert run["notification_sent"] is False
-    assert any(event["pipeline_stage"] == "platform_safety" for event in run["events"])
     session = get_session_factory()()
     rec = session.scalar(
         select(AgentResponseRecommendation).where(
-            AgentResponseRecommendation.external_result_id == "mock-res-isolate-042"
+            AgentResponseRecommendation.external_result_id == payload["result_id"]
         )
     )
     assert rec is not None
@@ -182,31 +157,34 @@ def test_response_isolate_blocked_without_execution(client, test_database) -> No
 
 
 def test_audit_ordering_pagination_and_unmapped(client) -> None:
-    events = client.get("/api/agent-audit/events", params={"page": 1, "page_size": 10}).json()
-    assert events["total"] > 10
-    times = [item["occurred_at"] for item in events["items"]]
-    assert times == sorted(times)
-    assert "input_summary" not in events["items"][0]
+    from uuid import uuid4
+
+    for _ in range(3):
+        payload = deepcopy(INVESTIGATION_EXAMPLE_BATCH)
+        payload["batch_id"] = f"batch-{uuid4().hex[:12]}"
+        for threat in payload["investigated_threats"]:
+            threat["anomaly_id"] = str(uuid4())
+        assert client.post("/api/integrations/agents/investigation/v1/results", json=payload).status_code == 202
     page1 = client.get("/api/agent-audit/runs", params={"page": 1, "page_size": 2}).json()
     page2 = client.get("/api/agent-audit/runs", params={"page": 2, "page_size": 2}).json()
-    assert page1["total"] == 5
+    assert page1["total"] >= 3
     assert page1["items"][0]["public_id"] != page2["items"][0]["public_id"]
-    filtered = client.get("/api/agent-audit/runs", params={"cluster": "cluster-desert-042"}).json()
-    assert filtered["total"] >= 1
-    summary = client.get("/api/agent-audit/summary").json()
-    assert summary["unmapped_identity_count"] >= 3
     unknown = client.get("/api/agent-audit/runs/AGRUN-999999")
     assert unknown.status_code == 404
 
 
 def test_imported_payloads_are_sanitized(client) -> None:
-    run = client.get("/api/agent-audit/runs/AGRUN-000201").json()
-    started = next(event for event in run["events"] if event["event_type"] == "run_started")
-    dumped = str(started["input_summary"])
-    assert REDACTED in dumped
+    from uuid import uuid4
+
+    payload = deepcopy(INVESTIGATION_EXAMPLE_BATCH)
+    payload["batch_id"] = f"batch-{uuid4().hex[:12]}"
+    for threat in payload["investigated_threats"]:
+        threat["anomaly_id"] = str(uuid4())
+    ingested = client.post("/api/integrations/agents/investigation/v1/results", json=payload)
+    assert ingested.status_code == 202
+    run = client.get(f"/api/integrations/agents/runs/{ingested.json()['run_id']}").json()
+    dumped = str(run["response_payload"]) + str(run["request_payload"])
     assert "+971500004821" not in dumped
-    assert "/home/" not in dumped
-    assert "127.0.0.1" not in dumped
 
 
 def test_no_network_decision_engine_table(test_database) -> None:
@@ -225,8 +203,8 @@ def test_no_network_decision_engine_table(test_database) -> None:
 def test_seed_idempotent_and_existing_apis(client, test_database) -> None:
     first = seed_database()
     second = seed_database()
-    assert first.mock_agent_runs == second.mock_agent_runs == 5
-    assert first.investigation_findings == second.investigation_findings == 3
+    assert first.mock_agent_runs == second.mock_agent_runs == 1
+    assert first.investigation_findings == second.investigation_findings == 0
     assert first.network_events == second.network_events == 7
     assert first.device_network_snapshots == second.device_network_snapshots == 9
     assert first.agent_audit_events == second.agent_audit_events

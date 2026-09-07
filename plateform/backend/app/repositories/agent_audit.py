@@ -22,7 +22,7 @@ class AgentAuditRepository:
         detection: str | None = None,
         device: str | None = None,
         cluster: str | None = None,
-        data_mode: str | None = MOCK_DATA_MODE,
+        data_mode: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
         search: str | None = None,
@@ -81,6 +81,8 @@ class AgentAuditRepository:
             )
         if data_mode:
             stmt = stmt.where(AgentRun.data_mode == data_mode)
+        else:
+            stmt = stmt.where(AgentRun.data_mode != MOCK_DATA_MODE)
         if start is not None:
             stmt = stmt.where(AgentRun.started_at >= start)
         if end is not None:
@@ -122,7 +124,7 @@ class AgentAuditRepository:
         detection: str | None = None,
         device: str | None = None,
         cluster: str | None = None,
-        data_mode: str | None = MOCK_DATA_MODE,
+        data_mode: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
         search: str | None = None,
@@ -153,6 +155,8 @@ class AgentAuditRepository:
             stmt = stmt.where(AgentAuditEvent.external_cluster_id.ilike(f"%{cluster.strip()}%"))
         if data_mode:
             stmt = stmt.where(AgentAuditEvent.data_mode == data_mode)
+        else:
+            stmt = stmt.where(AgentAuditEvent.data_mode != MOCK_DATA_MODE)
         if start is not None:
             stmt = stmt.where(AgentAuditEvent.occurred_at >= start)
         if end is not None:
@@ -212,8 +216,11 @@ class AgentAuditRepository:
         )
         return self.session.scalars(stmt).first()
 
-    def unmapped_identity_count(self, *, data_mode: str | None = MOCK_DATA_MODE) -> int:
+    def unmapped_identity_count(self, *, data_mode: str | None = None) -> int:
         stmt = select(func.count()).select_from(AgentFinding).where(AgentFinding.mapping_status != "mapped")
+        stmt = stmt.join(AgentRun, AgentFinding.agent_run_id == AgentRun.id)
         if data_mode:
-            stmt = stmt.join(AgentRun, AgentFinding.agent_run_id == AgentRun.id).where(AgentRun.data_mode == data_mode)
+            stmt = stmt.where(AgentRun.data_mode == data_mode)
+        else:
+            stmt = stmt.where(AgentRun.data_mode != MOCK_DATA_MODE)
         return int(self.session.scalar(stmt) or 0)

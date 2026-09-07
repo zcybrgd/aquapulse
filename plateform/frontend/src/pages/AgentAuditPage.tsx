@@ -28,13 +28,13 @@ export function AgentAuditPage() {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">Agent Audit Trail</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Lightweight detection → Investigation → Network management → Response → Platform safety
-            → Audit. Mock data from PostgreSQL. This log does not replace operator history.
+            Ingested Investigation and Response agent runs. Seeded mock findings are hidden. This
+            log does not replace operator history.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Badge className="bg-warning/15 text-ink">Mock agent data</Badge>
-          <StatusDot label="No agent executed" />
+          <Badge className="bg-teal-light text-teal">Ingested results</Badge>
+          <StatusDot label="Advisory only" />
           <p className="text-ink-muted">Updated {updatedAt ? formatDateTime(updatedAt.toISOString()) : "—"}</p>
           <Button variant="secondary" onClick={reload} disabled={loading || refreshing}>
             <RefreshCw size={14} aria-hidden="true" />
@@ -135,7 +135,7 @@ export function AgentAuditPage() {
       {summary ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Card className="min-w-0 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total mock runs</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total runs</p>
             <p className="mt-2 text-2xl font-semibold text-ink">{displayCount(summary.total_runs)}</p>
           </Card>
           <Card className="min-w-0 p-4">
@@ -166,7 +166,10 @@ export function AgentAuditPage() {
       ) : null}
 
       {!loading && items.length === 0 ? (
-        <EmptyState title="No mock agent runs" description="No seeded audit runs match these filters." />
+        <EmptyState
+          title="No ingested agent runs"
+          description="Runs appear here after the Investigation or Response agent posts results."
+        />
       ) : null}
 
       {items.length > 0 ? (

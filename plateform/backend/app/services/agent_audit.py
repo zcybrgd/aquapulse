@@ -7,7 +7,7 @@ from app.core.exceptions import AgentAuditEventNotFoundError, AgentAuditRunNotFo
 from app.data.incidents import SEED_NOW
 from app.db.models import AgentAuditEvent, AgentRun
 from app.integrations.sanitize import sanitize_payload
-from app.network.constants import MOCK_DATA_MODE, NETWORK_AGENT_CODE, NETWORK_CONTRACT
+from app.network.constants import NETWORK_AGENT_CODE, NETWORK_CONTRACT
 from app.repositories.agent_audit import AgentAuditRepository
 from app.schemas.agent_audit import (
     AgentAuditEventDetail,
@@ -140,7 +140,6 @@ class AgentAuditService:
         )
 
     def summary(self, **filters) -> AgentAuditSummary:
-        filters.setdefault("data_mode", MOCK_DATA_MODE)
         runs = self.repository.list_runs(**filters)
         by_agent: dict[str, int] = {}
         stages: dict[str, int] = {}
@@ -175,12 +174,11 @@ class AgentAuditService:
             stages_reached=[AgentCount(key=key, count=value) for key, value in sorted(stages.items())],
             last_run_at=last_run,
             unmapped_identity_count=self.repository.unmapped_identity_count(data_mode=filters.get("data_mode")),
-            data_mode=filters.get("data_mode") or MOCK_DATA_MODE,
+            data_mode=filters.get("data_mode") or "ingested",
             reference_time=SEED_NOW,
         )
 
     def list_runs(self, *, page: int = 1, page_size: int = 20, **filters) -> AgentAuditRunListResponse:
-        filters.setdefault("data_mode", MOCK_DATA_MODE)
         runs = self.repository.list_runs(**filters)
         page_rows, total = _paginate(runs, page, page_size)
         return AgentAuditRunListResponse(
@@ -188,7 +186,7 @@ class AgentAuditService:
             total=total,
             page=page,
             page_size=page_size,
-            data_mode=filters.get("data_mode") or MOCK_DATA_MODE,
+            data_mode=filters.get("data_mode") or "ingested",
             reference_time=SEED_NOW,
         )
 
@@ -219,11 +217,10 @@ class AgentAuditService:
             valve_command_confirmed=any(item.valve_command_confirmed for item in recs),
             notification_sent=any(item.notification_sent for item in recs),
             safety_status=recs[0].safety_status if recs else summary.mapping_status and None,
-            note="Mock agent data. No agent was executed. Agent audit logs do not replace operator history.",
+            note="Ingested agent result. Advisory only. Agent audit logs do not replace operator history.",
         )
 
     def list_events(self, *, page: int = 1, page_size: int = 50, **filters) -> AgentAuditEventListResponse:
-        filters.setdefault("data_mode", MOCK_DATA_MODE)
         events = self.repository.list_events(**filters)
         page_rows, total = _paginate(events, page, page_size)
         return AgentAuditEventListResponse(
@@ -231,7 +228,7 @@ class AgentAuditService:
             total=total,
             page=page,
             page_size=page_size,
-            data_mode=filters.get("data_mode") or MOCK_DATA_MODE,
+            data_mode=filters.get("data_mode") or "ingested",
             reference_time=SEED_NOW,
         )
 

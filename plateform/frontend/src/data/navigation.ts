@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Cable, Cpu, Headset, LayoutDashboard, Map, ScanSearch, ScrollText, Settings, TriangleAlert, Wifi, Wrench } from "lucide-react";
+import { Activity, Cable, Cpu, FlaskConical, Headset, LayoutDashboard, Map, ScanSearch, ScrollText, Settings, TriangleAlert, Wifi, Wrench } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -11,6 +11,7 @@ export interface NavItem {
 export const primaryNav: NavItem[] = [
   { label: "Overview", path: "/", title: "Overview", icon: LayoutDashboard },
   { label: "Live Map", path: "/map", title: "Live Map", icon: Map },
+  { label: "Pipeline Lab", path: "/pipeline-lab", title: "Pipeline Lab", icon: FlaskConical },
   { label: "Incidents", path: "/incidents", title: "Incident Center", icon: TriangleAlert },
   { label: "Operations", path: "/operations", title: "Operations Center", icon: Headset },
   { label: "Investigation Queue", path: "/detections", title: "Investigation Queue", icon: ScanSearch },
@@ -31,6 +32,9 @@ export const allNavItems = [...primaryNav, ...utilityNav];
 export function getPageTitle(pathname: string): string {
   if (/^\/incidents\/.+/.test(pathname)) {
     return "Incident details";
+  }
+  if (/^\/detections\/findings\/.+/.test(pathname)) {
+    return "Investigation Agent result";
   }
   if (/^\/detections\/.+/.test(pathname)) {
     return "Detection details";
@@ -55,6 +59,9 @@ export function getPageTitle(pathname: string): string {
   }
   if (pathname === "/network-health") {
     return "Network Health";
+  }
+  if (pathname === "/testbed") {
+    return "Pipeline Lab";
   }
   const match = allNavItems.find((item) => item.path === pathname);
   return match?.title ?? "AquaPulse";

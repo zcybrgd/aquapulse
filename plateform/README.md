@@ -1145,6 +1145,7 @@ Automatic deletion is **not** enabled. Do not add a retention job that drops see
 Frontend routes:
 
 - `/map` — Live Network Map
+- `/pipeline-lab` — Water-pipeline testbed digital twin (embedded dashboard)
 - `/assets` — Asset Registry
 - `/assets/:assetId` — Asset Details
 - `/maintenance` — Maintenance Center
@@ -1257,3 +1258,18 @@ If tiles fail to load, feature geometry still renders. The Live Map shows a tile
 Zone boundaries, pipeline paths, and asset points are fictional demo sketches around MENA-oriented seed coordinates. They are not live field surveys. Re-running the seed does not randomize or duplicate them.
 
 The Live Network Map route is `/map` (sidebar label: Live Map). Simulated sensor freshness is polled in a single batched request while that page is open.
+
+### Pipeline Lab (water-pipeline-testbed)
+
+`/pipeline-lab` embeds the existing testbed dashboard (FastAPI + Three.js on port 8080). It is **not** rewritten in React. AquaPulse does not own the physics, fault injection, or AIA verdicts.
+
+The testbed simulator defaults to host port 8000, which collides with the AquaPulse API. Start the testbed with the platform overlay so the simulator is published on **8002**:
+
+```bash
+cd aquapulse/water-pipeline-testbed
+docker compose -f docker-compose.yml -f docker-compose.plateform.yml up --build
+```
+
+Then open [http://127.0.0.1:5173/pipeline-lab](http://127.0.0.1:5173/pipeline-lab). Optional: `VITE_TESTBED_URL` in `frontend/.env` (default `http://127.0.0.1:8080`). Vite proxies `/pipeline-lab-proxy` to that dashboard for a same-origin health check. The iframe still loads the dashboard origin so WebSockets and `/static` keep working.
+
+Faults injected in the lab do **not** create AquaPulse incidents, refresh Nokia snapshots, or send valve commands.

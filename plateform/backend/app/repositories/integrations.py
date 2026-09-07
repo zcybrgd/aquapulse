@@ -1,8 +1,9 @@
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.network.constants import MOCK_DATA_MODE
 from app.db.models.integration import (
     AgentFinding,
     AgentIntegration,
@@ -23,8 +24,13 @@ class IntegrationRepository:
         return self.session.scalar(select(AgentIntegration).where(AgentIntegration.agent_code == agent_code))
 
     def next_run_public_id(self) -> str:
-        current = int(self.session.scalar(select(func.count()).select_from(AgentRun)) or 0)
-        return f"AGRUN-{current + 1:06d}"
+        existing = list(self.session.scalars(select(AgentRun.public_id)).all())
+        highest = 0
+        for public_id in existing:
+            suffix = public_id.rsplit("-", 1)[-1]
+            if suffix.isdigit():
+                highest = max(highest, int(suffix))
+        return f"AGRUN-{highest + 1:06d}"
 
     def get_run(self, public_id: str) -> AgentRun | None:
         return self.session.scalar(select(AgentRun).where(AgentRun.public_id == public_id))
@@ -32,10 +38,12 @@ class IntegrationRepository:
     def get_run_by_idempotency(self, key: str) -> AgentRun | None:
         return self.session.scalar(select(AgentRun).where(AgentRun.idempotency_key == key).order_by(AgentRun.created_at.asc()))
 
-    def list_runs(self, *, agent_type: str | None = None) -> list[AgentRun]:
+    def list_runs(self, *, agent_type: str | None = None, include_mock: bool = False) -> list[AgentRun]:
         stmt = select(AgentRun).order_by(AgentRun.created_at.desc())
         if agent_type:
             stmt = stmt.where(AgentRun.agent_type == agent_type)
+        if not include_mock:
+            stmt = stmt.where(AgentRun.data_mode != MOCK_DATA_MODE)
         return list(self.session.scalars(stmt.limit(100)).all())
 
     def add_run(self, run: AgentRun) -> None:
@@ -52,13 +60,25 @@ class IntegrationRepository:
             )
         )
 
-    def list_findings(self) -> list[AgentFinding]:
-        return list(self.session.scalars(select(AgentFinding).order_by(AgentFinding.created_at.desc()).limit(200)).all())
+    def list_findings(self, *, include_mock: bool = False) -> list[AgentFinding]:
+        stmt = (
+            select(AgentFinding)
+            .options(joinedload(AgentFinding.run))
+            .join(AgentRun, AgentFinding.agent_run_id == AgentRun.id)
+            .order_by(AgentFinding.created_at.desc())
+            .limit(200)
+        )
+        if not include_mock:
+            stmt = stmt.where(AgentRun.data_mode != MOCK_DATA_MODE)
+        return list(self.session.scalars(stmt).unique().all())
 
     def unmapped_finding_count(self) -> int:
         return int(
             self.session.scalar(
-                select(func.count()).select_from(AgentFinding).where(AgentFinding.mapping_status != "mapped")
+                select(func.count())
+                .select_from(AgentFinding)
+                .join(AgentRun, AgentFinding.agent_run_id == AgentRun.id)
+                .where(AgentFinding.mapping_status != "mapped", AgentRun.data_mode != MOCK_DATA_MODE)
             )
             or 0
         )
@@ -77,12 +97,16 @@ class IntegrationRepository:
             )
         )
 
-    def list_recommendations(self) -> list[AgentResponseRecommendation]:
-        return list(
-            self.session.scalars(
-                select(AgentResponseRecommendation).order_by(AgentResponseRecommendation.created_at.desc()).limit(200)
-            ).all()
+    def list_recommendations(self, *, include_mock: bool = False) -> list[AgentResponseRecommendation]:
+        stmt = (
+            select(AgentResponseRecommendation)
+            .join(AgentRun, AgentResponseRecommendation.agent_run_id == AgentRun.id)
+            .order_by(AgentResponseRecommendation.created_at.desc())
+            .limit(200)
         )
+        if not include_mock:
+            stmt = stmt.where(AgentRun.data_mode != MOCK_DATA_MODE)
+        return list(self.session.scalars(stmt).all())
 
     def add_recommendation(self, recommendation: AgentResponseRecommendation) -> None:
         self.session.add(recommendation)

@@ -9,17 +9,23 @@ import { StatusDot } from "../ui/StatusDot";
 interface DetectionQueueHeaderProps {
   stats: DetectionQueueStats | null;
   ready?: boolean;
+  findingCount?: number;
+  ingestReady?: boolean;
 }
 
-export function DetectionQueueHeader({ stats, ready = true }: DetectionQueueHeaderProps) {
+export function DetectionQueueHeader({
+  stats,
+  ready = true,
+  findingCount = 0,
+  ingestReady = false,
+}: DetectionQueueHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         <h2 className="text-2xl font-semibold tracking-tight text-ink">Investigation Queue</h2>
         <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-          Suspicious telemetry awaiting investigation. Deterministic rules provide Screening
-          priority only. Final classification and severity come from the Investigation Agent when a
-          mapped finding exists. A detection is not a confirmed incident.
+          Live Investigation Agent results land here after ingest. Screening rules stay on a
+          separate tab and are not agent verdicts. A finding is advisory, not a confirmed incident.
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <SimulatedTelemetryBadge />
@@ -31,9 +37,9 @@ export function DetectionQueueHeader({ stats, ready = true }: DetectionQueueHead
       </div>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <p className="text-ink-muted">
-          <span className="font-semibold text-ink">{ready && stats ? stats.new : "—"}</span> new
+          <span className="font-semibold text-ink">{findingCount}</span> agent results
         </p>
-        <StatusDot label="Deterministic rules" />
+        <StatusDot label={ingestReady ? "Ingest ready" : "Deterministic rules"} />
       </div>
     </div>
   );

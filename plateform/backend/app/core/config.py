@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     response_agent_timeout_seconds: float = 30
     response_agent_contract_version: str = "1.0"
     response_agent_recommend_path: str = "/v1/recommend-response"
-    agent_result_ingest_enabled: bool = False
+    agent_result_ingest_enabled: bool = True
     agent_support_services_mode: str = "mock"
     physical_commands_enabled: bool = False
     real_notifications_enabled: bool = False

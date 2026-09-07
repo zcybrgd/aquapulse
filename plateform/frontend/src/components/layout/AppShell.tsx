@@ -9,7 +9,10 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const title = getPageTitle(location.pathname);
-  const isLiveMap = location.pathname === "/map";
+  const isImmersive =
+    location.pathname === "/map" ||
+    location.pathname === "/pipeline-lab" ||
+    location.pathname === "/testbed";
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-page">
@@ -18,7 +21,7 @@ export function AppShell() {
         <TopBar title={title} onOpenSidebar={() => setSidebarOpen(true)} />
         <main
           className={
-            isLiveMap
+            isImmersive
               ? "h-[calc(100dvh-var(--topbar-height))] min-w-0 overflow-hidden p-0"
               : "min-w-0 overflow-x-hidden px-4 py-6 sm:px-6"
           }

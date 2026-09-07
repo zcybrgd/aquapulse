@@ -10,8 +10,8 @@ import type { AgentFindingRecord, AgentRecommendationRecord, AgentRunDetail } fr
 
 function BackLink() {
   return (
-    <Link to="/integrations" className="text-sm font-medium text-teal">
-      Back to Integration Readiness
+    <Link to="/detections" className="text-sm font-medium text-teal">
+      Back to Investigation Queue
     </Link>
   );
 }

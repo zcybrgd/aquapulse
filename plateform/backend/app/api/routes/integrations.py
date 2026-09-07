@@ -1,11 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 
 from app.api.deps import get_integration_service
 from app.integrations.contracts.investigation import AgentHealth
 from app.schemas.integrations import (
     AgentFindingRecord,
+    AgentIngestAccepted,
     AgentIntegrationDetail,
     AgentReadiness,
     AgentRecommendationRecord,
@@ -106,6 +107,24 @@ def get_recommendation(
     service: IntegrationService = Depends(get_integration_service),
 ) -> AgentRecommendationRecord:
     return service.get_recommendation(recommendation_id)
+
+
+@router.post("/investigation/v1/results", response_model=AgentIngestAccepted, status_code=202)
+def ingest_investigation_results(
+    payload: dict,
+    service: IntegrationService = Depends(get_integration_service),
+    x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
+) -> AgentIngestAccepted:
+    return service.accept_investigation_result(payload, idempotency_key=x_idempotency_key)
+
+
+@router.post("/response/v1/results", response_model=AgentIngestAccepted, status_code=202)
+def ingest_response_results(
+    payload: dict,
+    service: IntegrationService = Depends(get_integration_service),
+    x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
+) -> AgentIngestAccepted:
+    return service.accept_response_result(payload, idempotency_key=x_idempotency_key)
 
 
 @router.get("", response_model=list[AgentSummary])

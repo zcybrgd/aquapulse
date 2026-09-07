@@ -1,8 +1,7 @@
-"""Idempotent mock agent pipeline. Does not execute agents or mutate detections."""
+"""Clears dummy Investigation/Response agent rows. Keeps historical Network Agent drafts."""
 
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 from uuid import uuid4
@@ -12,23 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.data.incidents import SEED_NOW
 from app.db.models import AgentAuditEvent
-from app.db.models.detection import AnomalyDetection
 from app.db.models.integration import (
     AgentFinding,
     AgentIntegration,
     AgentResponseRecommendation,
     AgentRun,
 )
-from app.integrations.constants import (
-    CONTRACT_VERSION,
-    INVESTIGATION_AGENT,
-    RESPONSE_AGENT,
-    SAFETY_ADVISORY,
-    SAFETY_BLOCKED,
-)
-from app.integrations.fixtures import INVESTIGATION_EXAMPLE_BATCH, INVESTIGATION_EXAMPLE_REQUEST
+from app.integrations.constants import INVESTIGATION_AGENT, RESPONSE_AGENT
 from app.integrations.sanitize import sanitize_payload
-from app.network.constants import MOCK_DATA_MODE, NETWORK_AGENT_CODE, NETWORK_CONTRACT, RESPONSE_NODES
+from app.network.constants import MOCK_DATA_MODE, NETWORK_AGENT_CODE, NETWORK_CONTRACT
 
 MOCK_RUN_IDS = (
     "AGRUN-000201",
@@ -188,117 +179,7 @@ def seed_network_audit(session: Session) -> dict[str, int]:
     if investigation is None or response is None:
         raise RuntimeError("Investigation and Response agent integrations must be seeded first")
 
-    first_detection = session.scalar(select(AnomalyDetection).order_by(AnomalyDetection.detected_at.asc()))
-    detection_number = first_detection.detection_number if first_detection is not None else None
-
     seq = 1
-    seq = _event(
-        session,
-        public_id=f"AAE-{seq:06d}",
-        run=None,
-        agent_code="lightweight_detection_model",
-        contract_version="internal",
-        stage="lightweight_detection",
-        sequence=seq,
-        event_type="candidate_flagged",
-        status="completed",
-        summary="Lightweight model flagged a candidate anomaly. This is screening only.",
-        offset_sec=240 * 60,
-        detection=detection_number,
-        outputs={"screening": True, "note": "Not a confirmed pipe state."},
-    )
-
-    request = deepcopy(INVESTIGATION_EXAMPLE_REQUEST)
-    request["device_msisdn"] = "+971500004821"
-    request["operator_contact"] = {"phone": "+971500000000"}
-    request["debug_path"] = "/home/agent/models/investigation.bin"
-    request["internal_url"] = "http://127.0.0.1:9001/v1/investigate"
-    batch = deepcopy(INVESTIGATION_EXAMPLE_BATCH)
-    inv_run = _run(
-        session,
-        public_id="AGRUN-000201",
-        integration=investigation,
-        agent_type=INVESTIGATION_AGENT,
-        contract_version=CONTRACT_VERSION,
-        status="succeeded",
-        source_type="batch",
-        source_public_id=batch["batch_id"],
-        request=request,
-        response=batch,
-        started_offset_min=210,
-        duration_ms=5400,
-    )
-    seq = _event(
-        session,
-        public_id=f"AAE-{seq:06d}",
-        run=inv_run,
-        agent_code=INVESTIGATION_AGENT,
-        contract_version=CONTRACT_VERSION,
-        stage="anomaly_investigation",
-        sequence=seq,
-        event_type="run_started",
-        status="started",
-        summary="Investigation Agent mock import started.",
-        offset_sec=210 * 60,
-        node_name="ingest_batch",
-        inputs=request,
-        cluster="cluster-desert-042",
-    )
-    for threat in batch["investigated_threats"]:
-        session.add(
-            AgentFinding(
-                provider=INVESTIGATION_AGENT,
-                external_anomaly_id=threat["anomaly_id"],
-                agent_run_id=inv_run.id,
-                classification=threat["classification"],
-                severity_tier=threat["severity_tier"],
-                confidence_score=threat["confidence_score"],
-                external_cluster_id=threat["sensor_cluster_id"],
-                external_segment_id=threat["segment_id"],
-                external_valve_id=(threat.get("criticality_metrics") or {}).get("associated_valve_id"),
-                anomaly_detection_id=None,
-                mapped_detection_id=None,
-                mapping_status="unmapped",
-                network_status=threat["network_status"],
-                physical_deviations=threat["physical_deviations"],
-                criticality_metrics=threat["criticality_metrics"],
-                operator_justification=threat["operator_justification"],
-                raw_finding=sanitize_payload(threat),
-            )
-        )
-        seq = _event(
-            session,
-            public_id=f"AAE-{seq:06d}",
-            run=inv_run,
-            agent_code=INVESTIGATION_AGENT,
-            contract_version=CONTRACT_VERSION,
-            stage="anomaly_investigation",
-            sequence=seq,
-            event_type="finding_imported",
-            status="completed",
-            summary=f"Imported {threat['classification']} for {threat['sensor_cluster_id']}.",
-            offset_sec=209 * 60,
-            node_name="write_findings",
-            cluster=threat["sensor_cluster_id"],
-            device=(threat.get("criticality_metrics") or {}).get("associated_valve_id"),
-            outputs=threat,
-            reasoning=[{"step": "imported_team_fixture", "summary": threat["operator_justification"]}],
-        )
-    seq = _event(
-        session,
-        public_id=f"AAE-{seq:06d}",
-        run=inv_run,
-        agent_code=INVESTIGATION_AGENT,
-        contract_version=CONTRACT_VERSION,
-        stage="anomaly_investigation",
-        sequence=seq,
-        event_type="run_completed",
-        status="completed",
-        summary="Investigation Agent mock import completed. Identities remain unmapped.",
-        offset_sec=208 * 60,
-        duration_ms=5400,
-    )
-
     net_run = _run(
         session,
         public_id="AGRUN-000202",
@@ -355,144 +236,6 @@ def seed_network_audit(session: Session) -> dict[str, int]:
             outputs=envelope,
         )
 
-    def _response_run(public_id: str, decision: str, cluster: str, device: str, blocked: bool, offset: int, result_id: str) -> AgentRun:
-        run = _run(
-            session,
-            public_id=public_id,
-            integration=response,
-            agent_type=RESPONSE_AGENT,
-            contract_version=CONTRACT_VERSION,
-            status="succeeded",
-            source_type="cluster",
-            source_public_id=cluster,
-            request={"cluster_id": cluster, "device_id": device, "operator_contact": {"device_msisdn": "+971500004821"}},
-            response={"decision": decision, "notification_sent": False, "valve_command_sent": False},
-            started_offset_min=offset,
-            duration_ms=2800,
-        )
-        session.add(
-            AgentResponseRecommendation(
-                provider=RESPONSE_AGENT,
-                external_result_id=result_id,
-                agent_run_id=run.id,
-                external_incident_id=None,
-                external_cluster_id=cluster,
-                external_device_id=device,
-                mapped_incident_number=None,
-                mapped_device_id=None,
-                severity_tier=3 if decision == "AUTONOMOUS_ISOLATE" else 1,
-                decision=decision,
-                reachability={"status": "UNREACHABLE" if decision == "ESCALATE_UNREACHABLE" else "REACHABLE"},
-                notification_sent=False,
-                valve_command_sent=False,
-                valve_command_confirmed=False,
-                human_override_requested=decision in {"ALERT_AND_AWAIT", "AUTONOMOUS_ISOLATE"},
-                reasoning_trace=[{"step": "reachability_check"}, {"step": "llm_response_planner"}],
-                safety_status=SAFETY_BLOCKED if blocked else SAFETY_ADVISORY,
-                raw_result=sanitize_payload({"result_id": result_id, "decision": decision, "api_key": "should-redact"}),
-            )
-        )
-        return run
-
-    isolate = _response_run("AGRUN-000203", "AUTONOMOUS_ISOLATE", "cluster-desert-042", "valve-neom-north-01", True, 90, "mock-res-isolate-042")
-    escalate = _response_run("AGRUN-000204", "ESCALATE_UNREACHABLE", "cluster-desert-044", "valve-neom-north-03", False, 70, "mock-res-escalate-044")
-    alert = _response_run("AGRUN-000205", "ALERT_AND_AWAIT", "cluster-desert-044", "valve-neom-north-03", False, 50, "mock-res-alert-044")
-
-    def _response_nodes(run: AgentRun, decision: str, cluster: str, device: str, blocked: bool, offset: int) -> None:
-        nonlocal seq
-        seq = _event(
-            session,
-            public_id=f"AAE-{seq:06d}",
-            run=run,
-            agent_code=RESPONSE_AGENT,
-            contract_version=CONTRACT_VERSION,
-            stage="response",
-            sequence=seq,
-            event_type="run_started",
-            status="started",
-            summary="Response Agent mock recommendation started.",
-            offset_sec=offset * 60,
-            cluster=cluster,
-            device=device,
-        )
-        for index, node in enumerate(RESPONSE_NODES):
-            seq = _event(
-                session,
-                public_id=f"AAE-{seq:06d}",
-                run=run,
-                agent_code=RESPONSE_AGENT,
-                contract_version=CONTRACT_VERSION,
-                stage="response",
-                sequence=seq,
-                event_type="node_completed",
-                status="completed",
-                summary=f"Response Agent node {node}.",
-                offset_sec=offset * 60 - (index + 1) * 8,
-                node_name=node,
-                cluster=cluster,
-                device=device,
-                outputs={"node": node, "decision": decision, "notification_sent": False, "valve_command_sent": False},
-                reasoning=[{"step": node}],
-            )
-        if blocked:
-            seq = _event(
-                session,
-                public_id=f"AAE-{seq:06d}",
-                run=run,
-                agent_code="aquapulse_platform",
-                contract_version="platform",
-                stage="platform_safety",
-                sequence=seq,
-                event_type="safety_gate_checked",
-                status="blocked",
-                summary="Blocked by AquaPulse safety policy. Real execution disabled.",
-                offset_sec=offset * 60 - 60,
-                node_name="aquapulse_safety_gate",
-                cluster=cluster,
-                device=device,
-                outputs={
-                    "agent_requested_action": decision,
-                    "verification": "unverified",
-                    "real_execution": "disabled",
-                    "valve_state": "unchanged",
-                    "notification": "not_sent",
-                    "safety_status": "blocked",
-                },
-                safety=[{"check": "physical_commands_disabled", "result": "blocked"}],
-            )
-        seq = _event(
-            session,
-            public_id=f"AAE-{seq:06d}",
-            run=run,
-            agent_code="aquapulse_platform",
-            contract_version="platform",
-            stage="audit",
-            sequence=seq,
-            event_type="audit_written",
-            status="completed",
-            summary="Platform audit event written. No physical command was executed.",
-            offset_sec=offset * 60 - 70,
-            cluster=cluster,
-            device=device,
-            outputs={"persisted": True, "data_mode": MOCK_DATA_MODE},
-        )
-
-    _response_nodes(isolate, "AUTONOMOUS_ISOLATE", "cluster-desert-042", "valve-neom-north-01", True, 90)
-    _response_nodes(escalate, "ESCALATE_UNREACHABLE", "cluster-desert-044", "valve-neom-north-03", False, 70)
-    _response_nodes(alert, "ALERT_AND_AWAIT", "cluster-desert-044", "valve-neom-north-03", False, 50)
-
     session.flush()
     events = int(session.scalar(select(func.count()).select_from(AgentAuditEvent).where(AgentAuditEvent.public_id.like("AAE-%"))) or 0)
-    findings = int(
-        session.scalar(
-            select(func.count())
-            .select_from(AgentFinding)
-            .where(
-                AgentFinding.agent_run_id.in_(
-                    select(AgentRun.id).where(AgentRun.public_id.in_(MOCK_RUN_IDS))
-                )
-            )
-        )
-        or 0
-    )
-    return {"observations": 0, "network_events": 7, "runs": len(MOCK_RUN_IDS), "events": events, "findings": findings}
+    return {"observations": 0, "network_events": 7, "runs": 1, "events": events, "findings": 0}

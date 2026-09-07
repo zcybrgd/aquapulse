@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AgentIntegrationError, DatabaseUnavailableError
 from app.db.base import utc_now
-from app.db.models import Incident
+from app.db.models import AnomalyDetection, Incident
 from app.db.models.integration import (
     AgentFinding,
     AgentIntegration,
@@ -37,12 +37,13 @@ from app.integrations.contracts.investigation import (
 )
 from app.integrations.contracts.response import ResponseRequestV1, ResponseResultV1
 from app.integrations.factory import investigation_client, response_client
-from app.integrations.identity import investigation_mapper, response_mapper
+from app.integrations.identity import MappingLookup, investigation_mapper, response_mapper
 from app.integrations.redact import redact_payload
 from app.integrations.safety import evaluate_response_safety, never_infer_human_approval
 from app.repositories.integrations import IntegrationRepository
 from app.schemas.integrations import (
     AgentFindingRecord,
+    AgentIngestAccepted,
     AgentIntegrationDetail,
     AgentReadiness,
     AgentRecommendationRecord,
@@ -388,6 +389,7 @@ class IntegrationService:
             physical_deviations=row.physical_deviations,
             criticality_metrics=row.criticality_metrics,
             operator_justification=row.operator_justification,
+            data_mode=row.run.data_mode if row.run is not None else "simulated",
             created_at=row.created_at,
         )
 
@@ -417,6 +419,97 @@ class IntegrationService:
             reasoning_trace=row.reasoning_trace,
             safety_status=row.safety_status,
             created_at=row.created_at,
+        )
+
+    def _require_ingest(self) -> None:
+        if not self.settings.agent_result_ingest_enabled:
+            raise AgentIntegrationError(
+                "Agent result ingest is disabled.",
+                code="agent_ingest_disabled",
+                status_code=503,
+            )
+
+    def _resolve_detection(self, mapper, anomaly_id: str) -> MappingLookup:
+        lookup = mapper.resolve("detection", anomaly_id)
+        if anomaly_id.startswith("DET-"):
+            detection = self.session.scalar(
+                select(AnomalyDetection).where(AnomalyDetection.detection_number == anomaly_id)
+            )
+            if detection is not None:
+                return MappingLookup(anomaly_id, "detection", anomaly_id, True, None)
+        return lookup
+
+    def _detection_row(self, public_id: str | None) -> AnomalyDetection | None:
+        if not public_id:
+            return None
+        return self.session.scalar(select(AnomalyDetection).where(AnomalyDetection.detection_number == public_id))
+
+    def _accepted(self, *, agent: str, run: AgentRunDetail, created: int, duplicates: int) -> AgentIngestAccepted:
+        unmapped = sorted(
+            {
+                str(item.get("external_id"))
+                for item in run.mapping_warnings
+                if isinstance(item, dict) and item.get("external_id")
+            }
+        )
+        return AgentIngestAccepted(
+            status="accepted",
+            agent=agent,
+            run_id=run.run_id,
+            created=created,
+            duplicates=duplicates,
+            unmapped_ids=unmapped,
+        )
+
+    def accept_investigation_result(
+        self,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+    ) -> AgentIngestAccepted:
+        self._require_ingest()
+        try:
+            parsed = parse_investigation_response(payload)
+        except (ValidationError, ValueError) as exc:
+            raise AgentIntegrationError(
+                "The investigation response was rejected.",
+                code="agent_result_rejected",
+                status_code=422,
+            ) from exc
+        key = idempotency_key or f"investigation:{parsed.batch.batch_id}"
+        existing = self.repository.get_run_by_idempotency(key)
+        run = self.ingest_investigation_result(payload, idempotency_key=key)
+        count = len(parsed.batch.investigated_threats)
+        return self._accepted(
+            agent=INVESTIGATION_AGENT,
+            run=run,
+            created=0 if existing else count,
+            duplicates=count if existing else 0,
+        )
+
+    def accept_response_result(
+        self,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+    ) -> AgentIngestAccepted:
+        self._require_ingest()
+        try:
+            parsed = parse_response_result(payload)
+        except (ValidationError, ValueError) as exc:
+            raise AgentIntegrationError(
+                "The response result was rejected.",
+                code="agent_result_rejected",
+                status_code=422,
+            ) from exc
+        key = idempotency_key or f"response:{parsed.result_id}"
+        existing = self.repository.get_run_by_idempotency(key)
+        run = self.ingest_response_result(payload, idempotency_key=key)
+        return self._accepted(
+            agent=RESPONSE_AGENT,
+            run=run,
+            created=0 if existing else 1,
+            duplicates=1 if existing else 0,
         )
 
     def ingest_investigation_result(
@@ -481,7 +574,8 @@ class IntegrationService:
                 cluster = mapper.resolve("sensor_cluster", threat.sensor_cluster_id)
                 segment = mapper.resolve("segment", threat.segment_id)
                 valve = mapper.resolve("valve", threat.criticality_metrics.associated_valve_id)
-                detection = mapper.resolve("detection", threat.anomaly_id)
+                detection = self._resolve_detection(mapper, threat.anomaly_id)
+                detection_row = self._detection_row(detection.internal_public_id)
                 for lookup in (cluster, segment, valve, detection):
                     if lookup.warning:
                         warnings.append(lookup.warning)
@@ -489,7 +583,7 @@ class IntegrationService:
                 present = [item for item in mapped_ids if item]
                 if present and len(present) == 3:
                     mapping_status = "mapped"
-                elif present:
+                elif present or detection.mapped:
                     mapping_status = "partial"
                 else:
                     mapping_status = "unmapped"
@@ -504,6 +598,7 @@ class IntegrationService:
                         external_cluster_id=threat.sensor_cluster_id,
                         external_segment_id=threat.segment_id,
                         external_valve_id=threat.criticality_metrics.associated_valve_id,
+                        anomaly_detection_id=detection_row.id if detection_row is not None else None,
                         mapped_detection_id=detection.internal_public_id,
                         mapped_segment_id=segment.internal_public_id,
                         mapped_valve_id=valve.internal_public_id,
