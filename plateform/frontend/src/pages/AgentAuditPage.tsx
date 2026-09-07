@@ -28,8 +28,8 @@ export function AgentAuditPage() {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">Agent Audit Trail</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Ingested Investigation and Response agent runs. Seeded mock findings are hidden. This
-            log does not replace operator history.
+            Ingested Investigation and Response agent runs. Seeded mock agent data is not shown.
+            This log does not replace operator history.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">

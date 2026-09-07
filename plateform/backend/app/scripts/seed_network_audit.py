@@ -57,12 +57,22 @@ def _seed_network_agent(session: Session) -> AgentIntegration:
 
 
 def _clear(session: Session) -> None:
-    run_ids = list(session.scalars(select(AgentRun.id).where(AgentRun.public_id.in_(MOCK_RUN_IDS))).all())
-    if run_ids:
-        session.execute(delete(AgentAuditEvent).where(AgentAuditEvent.agent_run_id.in_(run_ids)))
-        session.execute(delete(AgentFinding).where(AgentFinding.agent_run_id.in_(run_ids)))
-        session.execute(delete(AgentResponseRecommendation).where(AgentResponseRecommendation.agent_run_id.in_(run_ids)))
-        session.execute(delete(AgentRun).where(AgentRun.id.in_(run_ids)))
+    dummy_run_ids = list(
+        session.scalars(
+            select(AgentRun.id).where(
+                (AgentRun.public_id.in_(MOCK_RUN_IDS))
+                | (
+                    AgentRun.agent_type.in_((INVESTIGATION_AGENT, RESPONSE_AGENT))
+                    & (AgentRun.data_mode == MOCK_DATA_MODE)
+                )
+            )
+        ).all()
+    )
+    if dummy_run_ids:
+        session.execute(delete(AgentAuditEvent).where(AgentAuditEvent.agent_run_id.in_(dummy_run_ids)))
+        session.execute(delete(AgentFinding).where(AgentFinding.agent_run_id.in_(dummy_run_ids)))
+        session.execute(delete(AgentResponseRecommendation).where(AgentResponseRecommendation.agent_run_id.in_(dummy_run_ids)))
+        session.execute(delete(AgentRun).where(AgentRun.id.in_(dummy_run_ids)))
     session.execute(delete(AgentAuditEvent).where(AgentAuditEvent.public_id.like("AAE-%")))
     session.flush()
 
@@ -238,4 +248,12 @@ def seed_network_audit(session: Session) -> dict[str, int]:
 
     session.flush()
     events = int(session.scalar(select(func.count()).select_from(AgentAuditEvent).where(AgentAuditEvent.public_id.like("AAE-%"))) or 0)
-    return {"observations": 0, "network_events": 7, "runs": 1, "events": events, "findings": 0}
+    recommendations = int(session.scalar(select(func.count()).select_from(AgentResponseRecommendation)) or 0)
+    return {
+        "observations": 0,
+        "network_events": 7,
+        "runs": 1,
+        "events": events,
+        "findings": 0,
+        "recommendations": recommendations,
+    }

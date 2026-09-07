@@ -87,7 +87,11 @@ class IntegrationRepository:
         self.session.add(finding)
 
     def get_recommendation(self, rec_id: UUID) -> AgentResponseRecommendation | None:
-        return self.session.get(AgentResponseRecommendation, rec_id)
+        return self.session.scalar(
+            select(AgentResponseRecommendation)
+            .options(joinedload(AgentResponseRecommendation.run))
+            .where(AgentResponseRecommendation.id == rec_id)
+        )
 
     def get_recommendation_by_result(self, provider: str, result_id: str) -> AgentResponseRecommendation | None:
         return self.session.scalar(

@@ -153,6 +153,7 @@ class AgentRecommendationRecord(BaseModel):
     reasoning_trace: list[Any] | dict[str, Any]
     safety_status: str
     advisory: bool = True
+    data_mode: str = "simulated"
     created_at: datetime
 
 

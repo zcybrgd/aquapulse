@@ -32,7 +32,7 @@ export function useAgentAuditRun(runId: string | undefined) {
       }
       setRun(null);
       setNotFound(false);
-      setError("We could not load this mock agent run.");
+      setError("We could not load this agent run.");
     } finally {
       setLoading(false);
     }
