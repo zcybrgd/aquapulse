@@ -50,11 +50,17 @@ class IntegrationRepository:
         self.session.add(run)
 
     def get_finding(self, finding_id: UUID) -> AgentFinding | None:
-        return self.session.get(AgentFinding, finding_id)
+        return self.session.scalar(
+            select(AgentFinding)
+            .options(joinedload(AgentFinding.run))
+            .where(AgentFinding.id == finding_id)
+        )
 
     def get_finding_by_anomaly(self, provider: str, anomaly_id: str) -> AgentFinding | None:
         return self.session.scalar(
-            select(AgentFinding).where(
+            select(AgentFinding)
+            .options(joinedload(AgentFinding.run))
+            .where(
                 AgentFinding.provider == provider,
                 AgentFinding.external_anomaly_id == anomaly_id,
             )

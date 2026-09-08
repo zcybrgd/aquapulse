@@ -88,10 +88,10 @@ def list_findings(service: IntegrationService = Depends(get_integration_service)
 
 @router.get("/findings/{finding_id}", response_model=AgentFindingRecord)
 def get_finding(
-    finding_id: UUID,
+    finding_id: str,
     service: IntegrationService = Depends(get_integration_service),
 ) -> AgentFindingRecord:
-    return service.get_finding(finding_id)
+    return service.get_finding_record(finding_id)
 
 
 @router.get("/recommendations", response_model=list[AgentRecommendationRecord])

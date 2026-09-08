@@ -357,6 +357,16 @@ class IntegrationService:
             raise AgentIntegrationError("Agent finding not found.", code="agent_invalid_response", status_code=404)
         return self._to_finding(row)
 
+    def get_finding_record(self, finding_id: str) -> AgentFindingRecord:
+        try:
+            return self.get_finding(UUID(finding_id))
+        except (ValueError, TypeError):
+            pass
+        row = self.repository.get_finding_by_anomaly(INVESTIGATION_AGENT, finding_id)
+        if row is None:
+            raise AgentIntegrationError("Agent finding not found.", code="agent_invalid_response", status_code=404)
+        return self._to_finding(row)
+
     def list_recommendations(self) -> list[AgentRecommendationRecord]:
         return [self._to_recommendation(row) for row in self.repository.list_recommendations()]
 
@@ -386,9 +396,9 @@ class IntegrationService:
             mapped_valve_id=row.mapped_valve_id,
             mapping_status=row.mapping_status,
             review_status=row.review_status,
-            network_status=row.network_status,
-            physical_deviations=row.physical_deviations,
-            criticality_metrics=row.criticality_metrics,
+            network_status=row.network_status or {},
+            physical_deviations=row.physical_deviations or {},
+            criticality_metrics=row.criticality_metrics or {},
             operator_justification=row.operator_justification,
             data_mode=row.run.data_mode if row.run is not None else "simulated",
             created_at=row.created_at,

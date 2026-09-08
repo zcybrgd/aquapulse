@@ -58,6 +58,10 @@ def test_real_contract_fixtures_still_persist_and_unknown_ids_stay_unmapped(clie
     run_id = ingested.json()["run_id"]
     findings = [item for item in client.get("/api/integrations/agents/findings").json() if item["run_id"] == run_id]
     assert len(findings) == 3
+    detail = client.get(f"/api/integrations/agents/findings/{findings[0]['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["id"] == findings[0]["id"]
+    assert detail.json()["external_anomaly_id"] == findings[0]["external_anomaly_id"]
     assert all(item["mapped_detection_id"] is None for item in findings)
     assert all(item["data_mode"] != MOCK_DATA_MODE for item in findings)
 

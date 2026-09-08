@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { fetchAgentFinding, fetchAgentRecommendation, fetchAgentRun } from "../api/integrations";
@@ -8,11 +9,26 @@ import { Skeleton } from "../components/ui/Skeleton";
 import { formatDateTime } from "../lib/format";
 import type { AgentFindingRecord, AgentRecommendationRecord, AgentRunDetail } from "../types/integrations";
 
-function BackLink() {
+function isCanceled(caught: unknown): boolean {
+  return isAxiosError(caught) && caught.code === "ERR_CANCELED";
+}
+
+function BackToQueue() {
   return (
     <Link to="/detections" className="text-sm font-medium text-teal">
       Back to Investigation Queue
     </Link>
+  );
+}
+
+function JsonBlock({ value }: { value: unknown }) {
+  if (value == null || (typeof value === "object" && value !== null && Object.keys(value as object).length === 0)) {
+    return <p className="text-sm text-ink-muted">Not supplied.</p>;
+  }
+  return (
+    <pre className="mt-2 max-h-64 overflow-auto rounded-xl bg-page p-3 text-xs text-ink">
+      {JSON.stringify(value, null, 2)}
+    </pre>
   );
 }
 
@@ -21,20 +37,33 @@ export function IntegrationRunPage() {
   const [run, setRun] = useState<AgentRunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchAgentRun(runId, { signal: controller.signal })
-      .then(setRun)
-      .catch(() => setError("This run could not be loaded."));
-    return () => controller.abort();
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (!runId) {
+      setError("This run could not be loaded.");
+      return;
+    }
+    setError(null);
+    try {
+      setRun(await fetchAgentRun(runId, { signal }));
+    } catch (caught: unknown) {
+      if (isCanceled(caught)) return;
+      setRun(null);
+      setError("This run could not be loaded.");
+    }
   }, [runId]);
 
-  if (error) return <ErrorState message={error} />;
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!run) return <Skeleton className="h-48 w-full" />;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <BackLink />
+      <BackToQueue />
       <Card className="p-5">
         <h2 className="text-xl font-semibold text-ink">{run.run_id}</h2>
         <p className="mt-1 text-sm text-ink-muted">
@@ -55,33 +84,87 @@ export function IntegrationRunPage() {
 
 export function IntegrationFindingPage() {
   const { findingId = "" } = useParams();
+  const id = decodeURIComponent(findingId);
   const [finding, setFinding] = useState<AgentFindingRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (!id) {
+      setError("This finding could not be loaded.");
+      return;
+    }
+    setError(null);
+    try {
+      setFinding(await fetchAgentFinding(id, { signal }));
+    } catch (caught: unknown) {
+      if (isCanceled(caught)) return;
+      setFinding(null);
+      setError("This finding could not be loaded.");
+    }
+  }, [id]);
+
   useEffect(() => {
     const controller = new AbortController();
-    void fetchAgentFinding(findingId, { signal: controller.signal })
-      .then(setFinding)
-      .catch(() => setError("This finding could not be loaded."));
+    void load(controller.signal);
     return () => controller.abort();
-  }, [findingId]);
+  }, [load]);
 
-  if (error) return <ErrorState message={error} />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!finding) return <Skeleton className="h-48 w-full" />;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <BackLink />
+      <BackToQueue />
       <Card className="p-5">
         <h2 className="text-xl font-semibold text-ink">{finding.classification_label}</h2>
         <p className="mt-1 text-sm text-ink-muted">{finding.severity_label}</p>
-        <p className="mt-3 text-sm text-ink">Anomaly {finding.external_anomaly_id}</p>
-        <p className="mt-1 text-sm text-ink-muted">
-          Mapping {finding.mapping_status}
-          {finding.mapped_detection_id ? ` · ${finding.mapped_detection_id}` : ""}
-        </p>
-        <p className="mt-3 text-sm font-medium text-ink">Agent result is advisory</p>
-        <p className="mt-2 text-sm text-ink-muted">{finding.operator_justification}</p>
+        <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-ink-muted">Anomaly</dt>
+            <dd className="mt-0.5 font-medium text-ink">{finding.external_anomaly_id}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Cluster</dt>
+            <dd className="mt-0.5 font-medium text-ink">{finding.external_cluster_id ?? "Unmapped"}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Classification</dt>
+            <dd className="mt-0.5 font-medium text-ink">{finding.classification}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Severity tier</dt>
+            <dd className="mt-0.5 font-medium text-ink">{finding.severity_tier}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Confidence</dt>
+            <dd className="mt-0.5 font-medium text-ink">{finding.confidence_score}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Mapping</dt>
+            <dd className="mt-0.5 font-medium text-ink">
+              {finding.mapping_status}
+              {finding.mapped_detection_id ? ` · ${finding.mapped_detection_id}` : ""}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-4 text-sm font-medium text-ink">Agent result is advisory</p>
+        <p className="mt-2 text-sm text-ink-muted">{finding.operator_justification ?? "No justification supplied."}</p>
+        <div className="mt-4">
+          <p className="text-sm font-medium text-ink">Physical deviations</p>
+          <JsonBlock value={finding.physical_deviations} />
+        </div>
+        <div className="mt-4">
+          <p className="text-sm font-medium text-ink">Criticality</p>
+          <JsonBlock value={finding.criticality_metrics} />
+        </div>
+        {finding.run_id ? (
+          <Link
+            to={`/agent-audit/runs/${encodeURIComponent(finding.run_id)}`}
+            className="mt-4 inline-block text-sm font-medium text-teal hover:underline"
+          >
+            Open agent audit run {finding.run_id}
+          </Link>
+        ) : null}
       </Card>
     </div>
   );
@@ -89,18 +172,32 @@ export function IntegrationFindingPage() {
 
 export function IntegrationRecommendationPage() {
   const { recommendationId = "" } = useParams();
+  const id = decodeURIComponent(recommendationId);
   const [item, setItem] = useState<AgentRecommendationRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (!id) {
+      setError("This recommendation could not be loaded.");
+      return;
+    }
+    setError(null);
+    try {
+      setItem(await fetchAgentRecommendation(id, { signal }));
+    } catch (caught: unknown) {
+      if (isCanceled(caught)) return;
+      setItem(null);
+      setError("This recommendation could not be loaded.");
+    }
+  }, [id]);
+
   useEffect(() => {
     const controller = new AbortController();
-    void fetchAgentRecommendation(recommendationId, { signal: controller.signal })
-      .then(setItem)
-      .catch(() => setError("This recommendation could not be loaded."));
+    void load(controller.signal);
     return () => controller.abort();
-  }, [recommendationId]);
+  }, [load]);
 
-  if (error) return <ErrorState message={error} />;
+  if (error) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!item) return <Skeleton className="h-48 w-full" />;
 
   return (
