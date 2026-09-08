@@ -9,6 +9,7 @@
 #   - Water pipeline testbed Docker stack
 #   - Platform backend
 #   - Investigation / AIA agent
+#   - Network Management / NMA agent
 #   - Platform frontend
 #
 # Usage:
@@ -40,6 +41,9 @@ FRONTEND_DIR="$PLATFORM_DIR/frontend"
 
 TESTBED_DIR="$ROOT_DIR/water-pipeline-testbed"
 AGENT_DIR="$ROOT_DIR/agents/investigation_agent"
+
+NETWORK_AGENT_DIR="$ROOT_DIR/agents/network_agent"
+NETWORK_AGENT_PORT=9001
 
 PLATFORM_COMPOSE="$PLATFORM_DIR/docker-compose.yml"
 TESTBED_COMPOSE="$TESTBED_DIR/docker-compose.yml"
@@ -187,6 +191,7 @@ REQUIRED_PATHS=(
     "$BACKEND_DIR"
     "$FRONTEND_DIR"
     "$AGENT_DIR"
+    "$NETWORK_AGENT_DIR"
 )
 
 for path in "${REQUIRED_PATHS[@]}"; do
@@ -366,6 +371,22 @@ start_service \
     --port "$AGENT_PORT" \
     --reload
 
+# Network Management Agent Webhook Server
+start_service \
+    "Network Agent Webhook" \
+    "$NETWORK_AGENT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" uvicorn webhook_server:app \
+    --host 0.0.0.0 \
+    --port "$NETWORK_AGENT_PORT" \
+    --reload
+
+# Network Management Agent Listener (Redis Bridge)
+start_service \
+    "Network Agent Listener" \
+    "$ROOT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" python "$NETWORK_AGENT_DIR/runner.py"
+
+
 # Platform frontend
 start_service \
     "Platform Frontend" \
@@ -392,12 +413,18 @@ ${GREEN}Testbed Dashboard:${RESET}
 ${GREEN}AIA Investigation Agent:${RESET}
     http://localhost:${AGENT_PORT}
 
+${GREEN}Network Management Agent Webhook:${RESET}
+    http://localhost:${NETWORK_AGENT_PORT}
+
 ${GREEN}Platform Frontend:${RESET}
     http://localhost:${FRONTEND_PORT}
 
 ${CYAN}Docker infrastructure:${RESET}
     Platform stack       → running
     Water pipeline stack → running
+
+${CYAN}Background Agents:${RESET}
+    NMA Redis Listener   → active (listening on 'aia:results')
 
 ${YELLOW}Press Ctrl+C to stop the local development services.${RESET}
 

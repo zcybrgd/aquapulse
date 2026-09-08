@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import re
@@ -7,7 +6,7 @@ from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from aia.config import IDENTIFIER_SANITIZATION_REGEX
 
@@ -91,6 +90,24 @@ class NetworkStatus(BaseModel):
     camara_congestion_level: CongestionLevel
     api_unavailable: bool
 
+    # NMA compatibility fields
+    device_online: bool = True
+    device_reachable: bool = True
+    network_degradation_detected: bool = False
+    camara_device_status: str = "CONNECTED"
+
+    @model_validator(mode="after")
+    def _sync_nma_fields(self) -> NetworkStatus:
+        is_reachable = str(self.camara_reachability_status).upper() in ("REACHABLE", "CONNECTED")
+        self.device_online = is_reachable and not self.api_unavailable
+        self.device_reachable = is_reachable and not self.api_unavailable
+        self.network_degradation_detected = self.camara_congestion_level in (
+            CongestionLevel.HIGH,
+            CongestionLevel.MEDIUM,
+        )
+        self.camara_device_status = str(self.camara_reachability_status)
+        return self
+
 
 class PhysicalDeviations(BaseModel):
     pressure_drop_pct: float
@@ -101,7 +118,6 @@ class PhysicalDeviations(BaseModel):
     estimated_volume_loss_lpm: Optional[float] = None
 
 
-# criticality selon : la proximite au reservoir et aussi le nombre de gens servis
 class CriticalityMetrics(BaseModel):
     criticality_score: int = Field(ge=1, le=3)
     proximity_to_reservoir_m: float
@@ -118,6 +134,7 @@ class CriticalityMetrics(BaseModel):
 class InvestigatedThreat(BaseModel):
     anomaly_id: str = Field(default_factory=lambda: str(uuid4()))
     sensor_cluster_id: str
+    device_id: Optional[str] = None  # NMA compatibility field
     segment_id: str
     classification: Classification
     severity_tier: int = Field(ge=1, le=3)
@@ -131,6 +148,12 @@ class InvestigatedThreat(BaseModel):
     @classmethod
     def _sanitize(cls, v: str) -> str:
         return sanitize_identifier(v)
+
+    @model_validator(mode="after")
+    def _sync_device_id(self) -> InvestigatedThreat:
+        if not self.device_id:
+            self.device_id = self.sensor_cluster_id
+        return self
 
 
 class AIABatchOutputPayload(BaseModel):
