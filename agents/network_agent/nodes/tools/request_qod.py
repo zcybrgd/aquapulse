@@ -1,12 +1,18 @@
-from typing import Dict, Any
+import os
+from typing import Dict, Any, Optional
 from langchain_core.tools import tool
+from dotenv import load_dotenv
 from agents.network_agent.camara_api import camara_service
+
+load_dotenv()
+
+DEFAULT_APP_SERVER_IPV4 = os.getenv("APP_SERVER_IPV4", "233.252.0.2")
 
 @tool
 def request_qod(
     device_id: str, 
-    app_server_ipv4: str, 
     qos_profile: str, 
+    app_server_ipv4: Optional[str]= None,
     duration_seconds: int = 3600,
     wait_for_allocation: bool = True,
     max_wait_seconds: int = 20
@@ -23,6 +29,8 @@ def request_qod(
         wait_for_allocation (boolean type): Whether to poll until status is AVAILABLE or max_wait_seconds expires.
         max_wait_seconds (integer type): Max duration in seconds to wait for allocation confirmation.
     """
+    if not app_server_ipv4:
+        app_server_ipv4 = DEFAULT_APP_SERVER_IPV4
     return camara_service.request_qod(
         device_id=device_id,
         app_server_ipv4=app_server_ipv4,
@@ -35,7 +43,6 @@ def request_qod(
 if __name__ == "__main__":
     test_payload = {
         "device_id": "+99999991000",
-        "app_server_ipv4": "233.252.0.2",
         "qos_profile": "QOS_L",
         "duration_seconds": 3600,
         "wait_for_allocation": True,
