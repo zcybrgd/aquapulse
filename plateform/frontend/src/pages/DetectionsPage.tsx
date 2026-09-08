@@ -18,7 +18,7 @@ type QueueTab = "agent" | "screening";
 
 export function DetectionsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<QueueTab>("screening");
+  const [tab, setTab] = useState<QueueTab>("agent");
   const { filters, setFilters, clearFilters, hasActiveFilters } = useDetectionFilters();
   const { items, total, stats, zones, rules, sensors, loading, error, reload } = useDetections(filters);
   const findings = useAgentFindings();
