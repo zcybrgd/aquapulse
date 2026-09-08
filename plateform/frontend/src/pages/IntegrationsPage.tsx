@@ -208,8 +208,8 @@ export function IntegrationsPage() {
               </div>
               {(data?.recommendations.length ?? 0) === 0 ? (
                 <EmptyState
-                  title="No recommendations"
-                  description="Response Agent output is stored as an unverified recommendation."
+                  title="No Response Agent recommendation available"
+                  description="Waiting for integration. Recommendations appear after a validated Response Agent POST."
                 />
               ) : (
                 <ul className="divide-y divide-line">

@@ -46,7 +46,7 @@ export function useAgentAuditData(filters: AgentAuditFilters) {
         if (requestId.current !== current) return;
         setSummary(null);
         setRuns(null);
-        setError("We could not load the mock agent audit trail. Confirm the API and database are running, then try again.");
+        setError("We could not load the agent audit trail. Confirm the API and database are running, then try again.");
       })
       .finally(() => {
         if (requestId.current === current) {

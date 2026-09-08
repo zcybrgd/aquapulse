@@ -3,9 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.network.constants import MOCK_DATA_MODE
-
-
 class AgentCount(BaseModel):
     key: str
     count: int
@@ -31,7 +28,7 @@ class AgentAuditEventSummary(BaseModel):
     error_code: str | None
     error_message: str | None
     duration_ms: int | None
-    data_mode: str = MOCK_DATA_MODE
+    data_mode: str = "ingested"
     occurred_at: datetime
     reasoning_summary: str | None
 
@@ -94,7 +91,7 @@ class AgentAuditRunListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    data_mode: str = MOCK_DATA_MODE
+    data_mode: str = "ingested"
     reference_time: datetime
 
 
@@ -103,7 +100,7 @@ class AgentAuditEventListResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    data_mode: str = MOCK_DATA_MODE
+    data_mode: str = "ingested"
     reference_time: datetime
 
 
@@ -117,6 +114,6 @@ class AgentAuditSummary(BaseModel):
     stages_reached: list[AgentCount]
     last_run_at: datetime | None
     unmapped_identity_count: int
-    data_mode: str = MOCK_DATA_MODE
+    data_mode: str = "ingested"
     reference_time: datetime
-    note: str = "Mock agent data. No agent was executed."
+    note: str = "Ingested agent result. Advisory only. Agent audit logs do not replace operator history."

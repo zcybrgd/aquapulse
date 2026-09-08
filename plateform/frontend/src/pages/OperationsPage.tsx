@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
 import { ClipboardList, RefreshCw, TimerReset } from "lucide-react";
 
+import { ResponseAgentPanel } from "../components/integrations/ResponseAgentPanel";
 import { OperationsCardList, OperationsTable } from "../components/operations/OperationsQueue";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { Skeleton } from "../components/ui/Skeleton";
+import { useAgentRecommendations } from "../hooks/useAgentRecommendations";
 import { useOperationsFilters } from "../hooks/useOperationsFilters";
 import { useOperationsQueue } from "../hooks/useOperationsQueue";
 import { formatDateTime } from "../lib/format";
@@ -34,6 +36,7 @@ function Kpi({
 export function OperationsPage() {
   const { filters, setFilters, clearFilters, hasActiveFilters } = useOperationsFilters();
   const { data, loading, error, updatedAt, reload } = useOperationsQueue(filters);
+  const recommendations = useAgentRecommendations();
   const summary = data?.summary;
   const zones = [...new Set((data?.items ?? []).map((item) => item.zone))].sort();
   const assignees = [...new Set((data?.items ?? []).map((item) => item.assigned_to || item.assigned_operator).filter(Boolean))] as string[];
@@ -149,6 +152,18 @@ export function OperationsPage() {
               )}
             </div>
             <div className="flex min-w-0 flex-col gap-4">
+              <ResponseAgentPanel
+                items={recommendations.items.filter((item) =>
+                  (data.items ?? []).some(
+                    (incident) =>
+                      item.mapped_incident_number === incident.incident_number ||
+                      item.mapped_incident_number === incident.id,
+                  ),
+                )}
+                loading={recommendations.loading}
+                error={recommendations.error}
+                onRetry={recommendations.reload}
+              />
               <TaskSideList
                 title="Overdue tasks"
                 icon={TimerReset}

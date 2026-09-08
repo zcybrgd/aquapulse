@@ -40,6 +40,7 @@ from app.integrations.factory import investigation_client, response_client
 from app.integrations.identity import MappingLookup, investigation_mapper, response_mapper
 from app.integrations.redact import redact_payload
 from app.integrations.safety import evaluate_response_safety, never_infer_human_approval
+from app.network.constants import MOCK_DATA_MODE
 from app.repositories.integrations import IntegrationRepository
 from app.schemas.integrations import (
     AgentFindingRecord,
@@ -332,7 +333,7 @@ class IntegrationService:
 
     def get_run(self, run_id: str) -> AgentRunDetail:
         run = self.repository.get_run(run_id)
-        if run is None:
+        if run is None or run.data_mode == MOCK_DATA_MODE:
             raise AgentIntegrationError("Agent run not found.", code="agent_invalid_response", status_code=404)
         summary = self._to_run_summary(run)
         return AgentRunDetail(
@@ -361,7 +362,7 @@ class IntegrationService:
 
     def get_recommendation(self, recommendation_id: UUID) -> AgentRecommendationRecord:
         row = self.repository.get_recommendation(recommendation_id)
-        if row is None:
+        if row is None or (row.run is not None and row.run.data_mode == MOCK_DATA_MODE):
             raise AgentIntegrationError("Agent recommendation not found.", code="agent_invalid_response", status_code=404)
         return self._to_recommendation(row)
 
@@ -418,6 +419,7 @@ class IntegrationService:
             human_override_response=row.human_override_response,
             reasoning_trace=row.reasoning_trace,
             safety_status=row.safety_status,
+            data_mode=row.run.data_mode if row.run is not None else "simulated",
             created_at=row.created_at,
         )
 
@@ -708,8 +710,8 @@ class IntegrationService:
                     decision=parsed.decision,
                     reachability=parsed.reachability,
                     notification_sent=False,
-                    valve_command_sent=parsed.valve_command_sent,
-                    valve_command_confirmed=parsed.valve_command_confirmed,
+                    valve_command_sent=False,
+                    valve_command_confirmed=False,
                     human_override_requested=parsed.human_override_requested,
                     human_override_response=parsed.human_override_response,
                     reasoning_trace=parsed.reasoning_trace,

@@ -114,6 +114,7 @@ export interface AgentRecommendationRecord {
   reasoning_trace: unknown;
   safety_status: string;
   advisory: boolean;
+  data_mode?: string;
   created_at: string;
 }
 

@@ -83,13 +83,17 @@ export function AgentAuditRunPage() {
       </div>
 
       {loading ? <Skeleton className="h-40 w-full" /> : null}
-      {!loading && notFound ? <EmptyState title="Unknown run" description="That mock agent run was not found." /> : null}
+      {!loading && notFound ? <EmptyState title="Unknown run" description="That agent run was not found." /> : null}
       {!loading && error && !notFound ? <ErrorState message={error} onRetry={reload} /> : null}
 
       {run ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-warning/15 text-ink">Mock agent data</Badge>
+            {run.data_mode === "mock_agent_data" ? (
+              <Badge className="bg-warning/15 text-ink">Mock agent data</Badge>
+            ) : (
+              <Badge className="bg-teal-light text-teal">Ingested result</Badge>
+            )}
             {run.contract_unconfirmed ? (
               <Badge className="bg-page text-ink">Network Agent contract awaiting team confirmation</Badge>
             ) : null}
@@ -154,20 +158,19 @@ export function AgentAuditRunPage() {
             </Card>
           ) : null}
 
-          {run.decision === "AUTONOMOUS_ISOLATE" ? (
-            <Card className="border-critical/30 p-5">
+          {run.recommendation_decisions.length > 0 ? (
+            <Card className={run.decision === "AUTONOMOUS_ISOLATE" ? "border-critical/30 p-5" : "p-5"}>
               <h3 className="text-base font-semibold text-ink">Response Agent recommendation</h3>
               <ul className="mt-3 space-y-1 text-sm text-ink">
-                <li>Agent requested/reported action: AUTONOMOUS_ISOLATE</li>
+                <li>Decision: {run.recommendation_decisions.join(", ")}</li>
                 <li>AquaPulse verification: unverified</li>
                 <li>Real execution: disabled</li>
-                <li>Valve state: unchanged</li>
-                <li>Notification: not sent</li>
-                <li>Safety status: blocked</li>
+                <li>Valve command: {run.valve_command_sent ? "reported sent" : "not sent"}</li>
+                <li>Notification: {run.notification_sent ? "reported sent" : "not sent"}</li>
+                <li>Safety status: {run.safety_status ?? "—"}</li>
               </ul>
               <p className="mt-3 text-sm text-ink-muted">
-                The agent graph places execute_response before human_override. AquaPulse does not treat that
-                order as authorization.
+                Stored as an advisory recommendation. AquaPulse does not execute a valve command.
               </p>
             </Card>
           ) : null}
@@ -175,7 +178,7 @@ export function AgentAuditRunPage() {
           <section className="flex flex-col gap-3">
             <h3 className="text-base font-semibold text-ink">Chronological stage timeline</h3>
             {run.events.length === 0 ? (
-              <EmptyState title="Partial audit timeline" description="This mock run has no stored audit events." />
+              <EmptyState title="Partial audit timeline" description="This run has no stored audit events." />
             ) : (
               run.events.map((event) => <EventCard key={event.id} event={event} />)
             )}

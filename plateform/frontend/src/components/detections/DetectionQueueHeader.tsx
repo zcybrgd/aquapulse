@@ -17,7 +17,7 @@ export function DetectionQueueHeader({
   stats,
   ready = true,
   findingCount = 0,
-  ingestReady = false,
+  ingestReady: _ingestReady = false,
 }: DetectionQueueHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -39,7 +39,7 @@ export function DetectionQueueHeader({
         <p className="text-ink-muted">
           <span className="font-semibold text-ink">{findingCount}</span> agent results
         </p>
-        <StatusDot label={ingestReady ? "Ingest ready" : "Deterministic rules"} />
+        <StatusDot label={findingCount > 0 ? "Investigation Agent results" : "Waiting for integration"} />
       </div>
     </div>
   );

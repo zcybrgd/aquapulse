@@ -67,6 +67,8 @@ export function NetworkHealthPage() {
   }
 
   const lastRefresh = summary?.last_refresh_at ?? devices?.last_refresh_at ?? null;
+  const networkConnected =
+    summary?.source_mode === "nokia_live" || summary?.source_mode === "nokia_simulator";
   const selectedZone =
     (summary?.available_zones ?? []).find(
       (zone) =>
@@ -80,7 +82,8 @@ export function NetworkHealthPage() {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">Network Health</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Monitor the mobile-network connectivity and network-derived location of AquaPulse devices.
+            Nokia/CAMARA connectivity for AquaPulse devices. The Network Agent is not part of this
+            integration.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -194,8 +197,14 @@ export function NetworkHealthPage() {
 
       {loading ? <Skeleton className="h-32 w-full" /> : null}
       {!loading && error ? <ErrorState title="Unable to load network health" message={error} onRetry={() => void refreshAll()} /> : null}
+      {!loading && !error && summary && !networkConnected ? (
+        <EmptyState
+          title="Network data source not connected"
+          description="Nokia/CAMARA APIs are disabled. Device reachability and network-derived location stay unavailable until a trusted source is connected."
+        />
+      ) : null}
 
-      {summary ? (
+      {summary && networkConnected ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {[
             ["Cellular devices", summary.cellular_devices],
@@ -213,11 +222,11 @@ export function NetworkHealthPage() {
         </div>
       ) : null}
 
-      {!loading && devices && devices.items.length === 0 ? (
+      {networkConnected && !loading && devices && devices.items.length === 0 ? (
         <EmptyState title="No devices match" description="No AquaPulse devices match these network filters." />
       ) : null}
 
-      {devices && devices.items.length > 0 ? (
+      {networkConnected && devices && devices.items.length > 0 ? (
         <>
           <div className="grid grid-cols-1 gap-3 md:hidden">
             {devices.items.map((item) => (

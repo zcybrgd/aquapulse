@@ -76,7 +76,7 @@ export function AssetHealthChart({
           </div>
         ) : (
           <span className="rounded-full bg-page px-2.5 py-0.5 text-[11px] font-medium text-ink-muted">
-            mock_recent_health
+            Recent health unavailable
           </span>
         )}
       </div>

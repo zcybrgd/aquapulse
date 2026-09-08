@@ -102,13 +102,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Local isolation in progress; adjacent DMAs stable",
             signal_strength_dbm=-71,
             packet_loss_percent=0.8,
-            device_reachability="Reachable",
-            network_priority_status="Granted",
-            agent_investigation_summary=(
-                "Detection and investigation agents agree this is a physical leak, not a "
-                "sensor artefact. Historical baseline and topology both point to a 400 mm "
-                "trunk joint east of the Corniche interceptor."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Keep the isolation valve closed, dispatch the Corniche repair crew, and "
                 "maintain CAMARA network priority until pressure recovers."
@@ -159,12 +155,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Priority requested; valve still open",
             signal_strength_dbm=-74,
             packet_loss_percent=1.1,
-            device_reachability="Reachable",
-            network_priority_status="Requested",
-            agent_investigation_summary=(
-                "The investigation agent ruled out a demand spike. Flow rose while "
-                "downstream sensors went quiet, which matches a break on Segment 7."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Approve isolation of VLV-HBR-007 and notify the Harbour DMA duty crew. "
                 "Hold network priority until the valve is confirmed closed."
@@ -215,12 +208,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Gateway reachable; field radios degrading",
             signal_strength_dbm=-91,
             packet_loss_percent=6.8,
-            device_reachability="Degraded",
-            network_priority_status="Requested",
-            agent_investigation_summary=(
-                "Reachability checks show SNS-AIN-221 dropping every third packet. Pressure and "
-                "flow remain inside the envelope, so a leak is unlikely."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Request a CAMARA quality boost for the Al Ain North cluster and schedule a "
                 "radio check at feeder chamber 3. Do not isolate the valve."
@@ -271,12 +261,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Stable connectivity; hydraulic deviation local",
             signal_strength_dbm=-69,
             packet_loss_percent=0.5,
-            device_reachability="Reachable",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "The detector flagged a pressure anomaly. The agent has not yet confirmed a leak; "
-                "the shape resembles a partially closed valve or a short transient."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Keep VLV-JED-112 under watch, compare with the next two downstream sensors, "
                 "and escalate to leak only if the drop persists for another 20 minutes."
@@ -327,12 +314,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Device online; measurement integrity failed",
             signal_strength_dbm=-66,
             packet_loss_percent=0.3,
-            device_reachability="Reachable",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "Neighbour comparison failed the sensor-integrity test. Flow did not move with "
-                "the reported pressure spikes, so the agent classified this as a sensor fault."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Flag SNS-DOH-044 for field replacement and exclude it from leak detection "
                 "until the spare is commissioned. No valve movement is required."
@@ -383,12 +367,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Within operating range after recovery",
             signal_strength_dbm=-72,
             packet_loss_percent=0.4,
-            device_reachability="Reachable",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "Confidence is moderate. The shape matches a short filling transient more than "
-                "a leak, but the agent left a watch in place until the next cycle."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Monitor for one more fill cycle. Escalate only if pressure fails to recover "
                 "or if Mutrah tank outflow diverges from the model."
@@ -439,12 +420,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Intermittent payload gaps on Arc B",
             signal_strength_dbm=-88,
             packet_loss_percent=4.2,
-            device_reachability="Degraded",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "The agent refused to classify a leak or a demand spike because 7 of 12 expected "
-                "frames were missing. A follow-up window is required."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action=(
                 "Wait for the next complete telemetry window and keep the incident open. Do not "
                 "operate VLV-CAS-031 on incomplete evidence."
@@ -495,13 +473,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Returned to envelope after shift start",
             signal_strength_dbm=-67,
             packet_loss_percent=0.2,
-            device_reachability="Reachable",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "The investigation agent matched the pulse to the known 05:00 industrial start "
-                "window. Classification was corrected to a normal demand spike and closed as a "
-                "false alarm."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action="No field action. Keep the start-up profile in the baseline model.",
             evidence=_evidence(
                 ("ev-1837-1", "telemetry_window", "Telemetry window", "05:00 industrial start-up pulse"),
@@ -549,12 +523,9 @@ def _build_incidents() -> list[IncidentDetail]:
             network_condition="Restored; packet delivery back above 99%",
             signal_strength_dbm=-70,
             packet_loss_percent=0.6,
-            device_reachability="Reachable",
-            network_priority_status="Not requested",
-            agent_investigation_summary=(
-                "A gateway firmware retry storm caused the degradation. After the restart, "
-                "sensors resumed a healthy cadence and hydraulics never left the envelope."
-            ),
+            device_reachability="Unavailable",
+            network_priority_status="Unavailable",
+            agent_investigation_summary="Awaiting Investigation Agent result",
             recommended_action="No further action. Record the gateway restart in the asset log.",
             evidence=_evidence(
                 ("ev-1834-1", "telemetry_window", "Telemetry window", "Radio retry storm then recovery"),
@@ -602,10 +573,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1842",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Night envelope breach on SNS-CRN-014.", TimelineSource.detector, "Complete"),
-                (4, "investigation_started", "Investigation started", "Investigation agent opened a leak hypothesis.", TimelineSource.agent, "Complete"),
+                (4, "investigation_started", "Investigation started", "Operator opened a leak investigation.", TimelineSource.system, "Complete"),
                 (7, "reachability_checked", "Device reachability checked", "Sensor and Corniche gateway both reachable.", TimelineSource.network, "Complete"),
-                (11, "incident_classified", "Incident classified", "Classified as a confirmed leak on the trunk main.", TimelineSource.agent, "Complete"),
-                (13, "severity_assigned", "Severity assigned", "Raised to Tier 3 because of coastal DMA impact.", TimelineSource.agent, "Complete"),
+                (11, "incident_classified", "Incident classified", "Operator classified this as a confirmed leak on the trunk main.", TimelineSource.system, "Complete"),
+                (13, "severity_assigned", "Severity assigned", "Severity set to Tier 3 because of coastal DMA impact.", TimelineSource.system, "Complete"),
                 (16, "network_priority_requested", "Network priority requested", "CAMARA quality-on-demand requested for field telemetry.", TimelineSource.network, "Complete"),
                 (21, "operator_notified", "Operator notified", "Layla Al Mansoori acknowledged the recommended isolation.", TimelineSource.operator, "Complete"),
             ],
@@ -614,10 +585,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1835",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Rapid pressure collapse on Harbour Segment 7.", TimelineSource.detector, "Complete"),
-                (3, "investigation_started", "Investigation started", "Agent compared Harbour and Jebel Ali fringe sensors.", TimelineSource.agent, "Complete"),
+                (3, "investigation_started", "Investigation started", "Harbour and Jebel Ali fringe sensors were compared.", TimelineSource.system, "Complete"),
                 (8, "reachability_checked", "Device reachability checked", "SNS-HBR-007 reachable with mild packet loss.", TimelineSource.network, "Complete"),
-                (12, "incident_classified", "Incident classified", "Confirmed leak; demand spike rejected.", TimelineSource.agent, "Complete"),
-                (14, "severity_assigned", "Severity assigned", "Tier 3 assigned due to transfer-main criticality.", TimelineSource.agent, "Complete"),
+                (12, "incident_classified", "Incident classified", "Operator confirmed a leak; demand spike rejected.", TimelineSource.system, "Complete"),
+                (14, "severity_assigned", "Severity assigned", "Severity set to Tier 3 due to transfer-main criticality.", TimelineSource.system, "Complete"),
                 (18, "network_priority_requested", "Network priority requested", "Priority requested ahead of isolation.", TimelineSource.network, "Complete"),
                 (24, "operator_notified", "Operator notified", "Omar Haddad asked to approve isolation of VLV-HBR-007.", TimelineSource.operator, "Waiting"),
             ],
@@ -626,10 +597,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1841",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Packet loss on Al Ain Feeder 3 crossed 5%.", TimelineSource.detector, "Complete"),
-                (5, "investigation_started", "Investigation started", "Agent started a connectivity-first investigation.", TimelineSource.agent, "Complete"),
+                (5, "investigation_started", "Investigation started", "Connectivity-first investigation started.", TimelineSource.system, "Complete"),
                 (8, "reachability_checked", "Device reachability checked", "Gateway healthy; last-hop radio weak.", TimelineSource.network, "Complete"),
-                (15, "incident_classified", "Incident classified", "Connectivity degradation; hydraulics remain stable.", TimelineSource.agent, "Complete"),
-                (17, "severity_assigned", "Severity assigned", "Tier 2 because monitoring coverage is reduced.", TimelineSource.agent, "Complete"),
+                (15, "incident_classified", "Incident classified", "Recorded as connectivity degradation; hydraulics remain stable.", TimelineSource.system, "Complete"),
+                (17, "severity_assigned", "Severity assigned", "Severity set to Tier 2 because monitoring coverage is reduced.", TimelineSource.system, "Complete"),
                 (22, "network_priority_requested", "Network priority requested", "Quality boost requested for the Al Ain cluster.", TimelineSource.network, "Complete"),
                 (28, "operator_notified", "Operator notified", "Noura Al Kaabi is coordinating a radio check.", TimelineSource.operator, "Complete"),
             ],
@@ -638,10 +609,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1833",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Obhur Feeder missed the expected morning ramp.", TimelineSource.detector, "Complete"),
-                (6, "investigation_started", "Investigation started", "Agent is comparing downstream hospital sensors.", TimelineSource.agent, "Complete"),
+                (6, "investigation_started", "Investigation started", "Downstream hospital sensors are being compared.", TimelineSource.system, "Complete"),
                 (9, "reachability_checked", "Device reachability checked", "Jeddah North radios are healthy.", TimelineSource.network, "Complete"),
-                (14, "incident_classified", "Incident classified", "Pressure anomaly, leak not yet confirmed.", TimelineSource.agent, "Complete"),
-                (16, "severity_assigned", "Severity assigned", "Tier 2 while the hospital campus is in the feed path.", TimelineSource.agent, "Complete"),
+                (14, "incident_classified", "Incident classified", "Recorded as a pressure anomaly; leak not yet confirmed.", TimelineSource.system, "Complete"),
+                (16, "severity_assigned", "Severity assigned", "Severity set to Tier 2 while the hospital campus is in the feed path.", TimelineSource.system, "Complete"),
                 (20, "network_priority_requested", "Network priority requested", "No CAMARA boost required yet.", TimelineSource.system, "Skipped"),
                 (25, "operator_notified", "Operator notified", "Hassan Farouk is watching the next 20 minutes.", TimelineSource.operator, "Complete"),
             ],
@@ -650,10 +621,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1838",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Impossible pressure spikes on SNS-DOH-044.", TimelineSource.detector, "Complete"),
-                (4, "investigation_started", "Investigation started", "Neighbour comparison started automatically.", TimelineSource.agent, "Complete"),
+                (4, "investigation_started", "Investigation started", "Neighbour comparison started.", TimelineSource.system, "Complete"),
                 (6, "reachability_checked", "Device reachability checked", "Radio path is healthy; values are not.", TimelineSource.network, "Complete"),
-                (10, "incident_classified", "Incident classified", "Sensor fault rather than a hydraulic event.", TimelineSource.agent, "Complete"),
-                (12, "severity_assigned", "Severity assigned", "Tier 2 until a spare meter is in place.", TimelineSource.agent, "Complete"),
+                (10, "incident_classified", "Incident classified", "Recorded as a sensor fault rather than a hydraulic event.", TimelineSource.system, "Complete"),
+                (12, "severity_assigned", "Severity assigned", "Severity set to Tier 2 until a spare meter is in place.", TimelineSource.system, "Complete"),
                 (15, "network_priority_requested", "Network priority requested", "Not required for a measurement fault.", TimelineSource.system, "Skipped"),
                 (18, "operator_notified", "Operator notified", "Unassigned; waiting for a Doha West operator.", TimelineSource.system, "Waiting"),
             ],
@@ -662,10 +633,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1840",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Soft envelope breach during Mutrah fill.", TimelineSource.detector, "Complete"),
-                (5, "investigation_started", "Investigation started", "Agent compared Ruwi alternate feed.", TimelineSource.agent, "Complete"),
+                (5, "investigation_started", "Investigation started", "Ruwi alternate feed was compared.", TimelineSource.system, "Complete"),
                 (8, "reachability_checked", "Device reachability checked", "Old Town mesh reachable.", TimelineSource.network, "Complete"),
-                (12, "incident_classified", "Incident classified", "Pressure anomaly with likely filling transient.", TimelineSource.agent, "Complete"),
-                (13, "severity_assigned", "Severity assigned", "Tier 1 watch only.", TimelineSource.agent, "Complete"),
+                (12, "incident_classified", "Incident classified", "Recorded as a pressure anomaly with a likely filling transient.", TimelineSource.system, "Complete"),
+                (13, "severity_assigned", "Severity assigned", "Severity set to Tier 1 watch only.", TimelineSource.system, "Complete"),
                 (16, "network_priority_requested", "Network priority requested", "Not requested.", TimelineSource.system, "Skipped"),
                 (19, "operator_notified", "Operator notified", "Fatima Al Lawati set a one-cycle monitor.", TimelineSource.operator, "Complete"),
             ],
@@ -674,10 +645,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1836",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Incomplete telemetry window on Medina Arc B.", TimelineSource.detector, "Complete"),
-                (3, "investigation_started", "Investigation started", "Agent paused classification pending more frames.", TimelineSource.agent, "Complete"),
+                (3, "investigation_started", "Investigation started", "Classification paused pending more frames.", TimelineSource.system, "Complete"),
                 (6, "reachability_checked", "Device reachability checked", "Gateway retries elevated on Arc B.", TimelineSource.network, "Complete"),
-                (9, "incident_classified", "Incident classified", "Insufficient data; no hydraulic class assigned.", TimelineSource.agent, "Complete"),
-                (10, "severity_assigned", "Severity assigned", "Tier 1 until a complete window arrives.", TimelineSource.agent, "Complete"),
+                (9, "incident_classified", "Incident classified", "Insufficient data; no hydraulic class assigned.", TimelineSource.system, "Complete"),
+                (10, "severity_assigned", "Severity assigned", "Severity set to Tier 1 until a complete window arrives.", TimelineSource.system, "Complete"),
                 (12, "network_priority_requested", "Network priority requested", "Held until completeness recovers.", TimelineSource.system, "Skipped"),
                 (14, "operator_notified", "Operator notified", "Unassigned; system is waiting for the next window.", TimelineSource.system, "Waiting"),
             ],
@@ -686,10 +657,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1837",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Industrial ring flow jumped at shift start.", TimelineSource.detector, "Complete"),
-                (6, "investigation_started", "Investigation started", "Agent compared weekday start-up profiles.", TimelineSource.agent, "Complete"),
+                (6, "investigation_started", "Investigation started", "Weekday start-up profiles were compared.", TimelineSource.system, "Complete"),
                 (8, "reachability_checked", "Device reachability checked", "Industrial ring radios healthy.", TimelineSource.network, "Complete"),
-                (14, "incident_classified", "Incident classified", "Normal demand spike, not a leak.", TimelineSource.agent, "Complete"),
-                (15, "severity_assigned", "Severity assigned", "Remained Tier 1 after reclassification.", TimelineSource.agent, "Complete"),
+                (14, "incident_classified", "Incident classified", "Recorded as a normal demand spike, not a leak.", TimelineSource.system, "Complete"),
+                (15, "severity_assigned", "Severity assigned", "Severity remained Tier 1 after reclassification.", TimelineSource.system, "Complete"),
                 (18, "network_priority_requested", "Network priority requested", "Not required.", TimelineSource.system, "Skipped"),
                 (22, "operator_notified", "Operator notified", "Yousef Al Qahtani closed the event as a false alarm.", TimelineSource.operator, "Complete"),
             ],
@@ -698,10 +669,10 @@ def _build_timelines() -> dict[str, list[TimelineEvent]]:
             "INC-1834",
             [
                 (0, "anomaly_detected", "Anomaly detected", "Abdali trunk packet loss climbed above 8%.", TimelineSource.detector, "Complete"),
-                (4, "investigation_started", "Investigation started", "Agent checked hydraulics and radio health together.", TimelineSource.agent, "Complete"),
+                (4, "investigation_started", "Investigation started", "Hydraulics and radio health were checked together.", TimelineSource.system, "Complete"),
                 (7, "reachability_checked", "Device reachability checked", "AMM-GW-03 was restarting.", TimelineSource.network, "Complete"),
-                (20, "incident_classified", "Incident classified", "Connectivity degradation with no leak signature.", TimelineSource.agent, "Complete"),
-                (21, "severity_assigned", "Severity assigned", "Tier 2 while coverage was reduced.", TimelineSource.agent, "Complete"),
+                (20, "incident_classified", "Incident classified", "Recorded as connectivity degradation with no leak signature.", TimelineSource.system, "Complete"),
+                (21, "severity_assigned", "Severity assigned", "Severity set to Tier 2 while coverage was reduced.", TimelineSource.system, "Complete"),
                 (36, "network_priority_requested", "Network priority requested", "Not needed after gateway recovery.", TimelineSource.system, "Skipped"),
                 (48, "operator_notified", "Operator notified", "Rania Nasser marked the incident resolved.", TimelineSource.operator, "Complete"),
             ],

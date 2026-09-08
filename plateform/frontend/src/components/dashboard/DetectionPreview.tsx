@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 
 import { formatDateTime } from "../../lib/format";
 import { scorePercent } from "../../lib/detections";
+import { useAgentFindings } from "../../hooks/useAgentFindings";
 import { useDetectionPreview } from "../../hooks/useDetections";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
@@ -14,6 +15,7 @@ import { DetectionStatusBadge } from "../detections/DetectionStatusBadge";
 
 export function DetectionPreview() {
   const { stats, loading, error, reload } = useDetectionPreview();
+  const findings = useAgentFindings();
   const reduceMotion = useReducedMotion();
   const preview = stats?.highest_priority ?? null;
   const awaiting = (stats?.new ?? 0) + (stats?.queued ?? 0);
@@ -29,7 +31,11 @@ export function DetectionPreview() {
           <div>
             <h3 className="text-base font-semibold text-ink">Investigation queue</h3>
             <p className="mt-0.5 text-sm text-ink-muted">
-              {loading ? "Loading detections" : `${awaiting} new detections awaiting investigation`}
+              {loading
+                ? "Loading detections"
+                : findings.items.length > 0
+                  ? `${findings.items.length} Investigation Agent results`
+                  : `${awaiting} screening detections · Awaiting Investigation Agent result`}
             </p>
           </div>
           <Link

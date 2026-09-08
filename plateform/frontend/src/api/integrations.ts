@@ -30,6 +30,8 @@ export async function fetchAgentRecommendations(options?: {
   return data;
 }
 
+const MOCK_MODE = "mock_agent_data";
+
 export async function fetchIntegrationBundle(options?: { signal?: AbortSignal }): Promise<IntegrationBundle> {
   const config = { signal: options?.signal };
   const [readiness, findings, recommendations] = await Promise.all([
@@ -37,7 +39,11 @@ export async function fetchIntegrationBundle(options?: { signal?: AbortSignal })
     fetchAgentFindings(config),
     fetchAgentRecommendations(config),
   ]);
-  return { readiness, findings, recommendations };
+  return {
+    readiness,
+    findings: findings.filter((item) => item.data_mode !== MOCK_MODE),
+    recommendations: recommendations.filter((item) => item.data_mode !== MOCK_MODE),
+  };
 }
 
 export async function fetchAgentRun(runId: string, options?: { signal?: AbortSignal }): Promise<AgentRunDetail> {

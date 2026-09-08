@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 
+import { ResponseAgentPanel } from "../components/integrations/ResponseAgentPanel";
 import { IncidentActions } from "../components/incidents/IncidentActions";
 import { IncidentDetailHeader } from "../components/incidents/IncidentDetailHeader";
 import { IncidentDetailSkeleton } from "../components/incidents/IncidentDetailSkeleton";
@@ -15,6 +16,7 @@ import { IncidentTelemetryChart } from "../components/incidents/IncidentTelemetr
 import { IncidentTimeline } from "../components/incidents/IncidentTimeline";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
+import { useAgentRecommendations } from "../hooks/useAgentRecommendations";
 import { useIncidentDetail } from "../hooks/useIncidentDetail";
 import { useIncidentOperations } from "../hooks/useIncidentOperations";
 
@@ -23,7 +25,15 @@ export function IncidentDetailPage() {
   const location = useLocation();
   const { incident, events, loading, notFound, error, reload } = useIncidentDetail(incidentId);
   const operations = useIncidentOperations(incidentId);
+  const recommendations = useAgentRecommendations();
   const reduceMotion = useReducedMotion();
+  const incidentRecommendations = recommendations.items.filter(
+    (item) =>
+      item.mapped_incident_number === incidentId ||
+      item.mapped_incident_number === incident?.incident_number ||
+      item.external_incident_id === incidentId ||
+      item.external_incident_id === incident?.incident_number,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">
@@ -41,7 +51,7 @@ export function IncidentDetailPage() {
           </Link>
           <EmptyState
             title="Incident not found"
-            description="This incident ID is not in the current mock set. Return to the Incident Center and choose another record."
+            description="This incident ID is not in the current catalogue. Return to the Incident Center and choose another record."
           />
         </div>
       ) : null}
@@ -63,6 +73,12 @@ export function IncidentDetailPage() {
             <div className="flex min-w-0 flex-col gap-4">
               <IncidentLocationPanel incident={incident} />
               <IncidentNetworkPanel incident={incident} />
+              <ResponseAgentPanel
+                items={incidentRecommendations}
+                loading={recommendations.loading}
+                error={recommendations.error}
+                onRetry={recommendations.reload}
+              />
               <IncidentDeviceNetworkContext incidentId={incident.id} />
               <IncidentEvidenceList evidence={incident.evidence} />
               <IncidentRelatedMaintenance incidentId={incident.id} />

@@ -105,7 +105,9 @@ export function IntegrationRecommendationPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <BackLink />
+      <Link to="/integrations" className="text-sm font-medium text-teal">
+        Back to Integrations
+      </Link>
       <Card className="p-5">
         <h2 className="text-xl font-semibold text-ink">{item.decision}</h2>
         <p className="mt-1 text-sm text-ink-muted">

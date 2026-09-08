@@ -40,7 +40,7 @@ export function TopBar({ title, onOpenSidebar }: TopBarProps) {
       </select>
 
       <div className="hidden items-center rounded-xl border border-line bg-page px-3 py-2 md:flex">
-        <StatusDot label="All systems operational" />
+        <StatusDot label="Waiting for integration" />
       </div>
 
       <button

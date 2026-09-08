@@ -121,7 +121,7 @@ export function DetectionTable({
               <td className="px-4 py-3 align-top">
                 <DetectionPriorityBadge priority={item.priority} />
                 {item.awaiting_agent_investigation ? (
-                  <p className="mt-1 text-xs text-ink-muted">Awaiting agent investigation</p>
+                  <p className="mt-1 text-xs text-ink-muted">Awaiting Investigation Agent result</p>
                 ) : null}
                 {item.has_agent_finding ? (
                   <p className="mt-1 text-xs text-teal">Agent-assessed</p>
@@ -178,7 +178,7 @@ export function DetectionCardList({
                 <DetectionPriorityBadge priority={item.priority} />
                 <DetectionStatusBadge status={item.status} />
                 {item.awaiting_agent_investigation ? (
-                  <span className="text-xs text-ink-muted">Awaiting agent investigation</span>
+                  <span className="text-xs text-ink-muted">Awaiting Investigation Agent result</span>
                 ) : null}
                 {item.has_agent_finding ? <span className="text-xs text-teal">Agent-assessed</span> : null}
               </div>

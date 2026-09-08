@@ -30,15 +30,27 @@ export function KpiGrid({ summary }: KpiGridProps) {
       />
       <KpiCard
         label="Network health"
-        value={formatPercent(summary.network_health_percent)}
-        context="Within operating range"
+        value={
+          summary.network_health_percent == null
+            ? "Unavailable"
+            : formatPercent(summary.network_health_percent)
+        }
+        context={
+          summary.network_health_percent == null
+            ? "No packet-delivery sample is available"
+            : "From TimescaleDB telemetry"
+        }
         icon={Activity}
         delay={0.1}
       />
       <KpiCard
         label="Average response time"
-        value={`${formatNumber(summary.average_response_time_min, 1)} min`}
-        context="Target under 15 min"
+        value={
+          summary.average_response_time_min == null
+            ? "Unavailable"
+            : `${formatNumber(summary.average_response_time_min, 1)} min`
+        }
+        context="Not calculated from a trusted source"
         icon={Timer}
         delay={0.14}
       />
