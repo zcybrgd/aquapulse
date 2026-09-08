@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "data_mode": "simulated",
+  "batch": {
+    "batch_id": "batch-test-001",
+    "investigated_threats": [
+      {
+        "anomaly_id": "DET-001",
+        "classification": "LEAK_SUSPECTED",
+        "severity_tier": 1,
+        "confidence_score": 0.94,
+        "sensor_cluster_id": "CLUSTER-01",
+        "segment_id": "SEG-01",
+        "network_status": {
+          "reachability": "REACHABLE",
+          "latency_ms": 15
+        },
+        "physical_deviations": {
+          "pressure_drop_psi": 18.2
+        },
+        "criticality_metrics": {
+          "associated_valve_id": "VALVE-01"
+        },
+        "operator_justification": "Significant pressure loss detected downstream of Pipe Segment P-1."
+      }
+    ]
+  }
+}

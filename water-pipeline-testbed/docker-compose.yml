@@ -16,7 +16,7 @@ services:
       POSTGRES_PASSWORD: aia
       POSTGRES_DB: aia
     ports:
-      - "5432:5432"
+      - "5433:5432"   # Changed host port from 5432 to 5433
     volumes:
       - timescale_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +32,7 @@ services:
       TICK_SECONDS: "2.0"
       BATCH_INTERVAL_TICKS: "2"
     ports:
-      - "8000:8000"
+      - "8001:8000"   # Changed host port from 8000 to 8001
     depends_on:
       redis:
         condition: service_healthy

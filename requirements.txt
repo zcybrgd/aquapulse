@@ -20,5 +20,11 @@ pandas
 redis 
 
 
+alembic
+psycopg
+shapely
+httpx
+
+
 # psycopg2-binary>=2.9  # TimescaleDBStore
 # httpx>=0.27            # HttpCamaraClient (live Nokia NaC sandbox)
