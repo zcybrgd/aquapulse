@@ -19,12 +19,8 @@ openai>=1.0
 pandas
 redis 
 
-
+psycopg2-binary
 alembic
 psycopg
 shapely
 httpx
-
-
-# psycopg2-binary>=2.9  # TimescaleDBStore
-# httpx>=0.27            # HttpCamaraClient (live Nokia NaC sandbox)

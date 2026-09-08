@@ -111,37 +111,42 @@ def get_agent() -> tuple[AnomalyInvestigationAgent, BaselineStore]:
         agent_instance, baseline_store_instance = initialize_agent()
     return agent_instance, baseline_store_instance
 
-
 def forward_to_aquapulse_platform(raw_payload: Dict[str, Any]) -> None:
     """
     Ensures contract 1.0 payload compliance and forwards investigation findings
-    directly to the AquaPulse Backend Platform ingestion endpoint.
+    directly to the AquaPulse Backend Platform validation/ingestion endpoint.
     """
-    # Ensure raw output conforms to Contract 1.0 structure expected by integrations.py
+    batch_id = raw_payload.get("batch_id", f"batch-{int(datetime.now(timezone.utc).timestamp())}")
+    threats = raw_payload.get("investigated_threats", raw_payload.get("threats", []))
+
     if "batch" in raw_payload and isinstance(raw_payload["batch"], dict):
         formatted_payload = raw_payload
+        batch_id = raw_payload["batch"].get("batch_id", batch_id)
+        threats = raw_payload["batch"].get("investigated_threats", threats)
     else:
+        distinct_clusters = len({t.get("sensor_cluster_id") for t in threats if t.get("sensor_cluster_id")})
         formatted_payload = {
             "schema_version": raw_payload.get("schema_version", "1.0"),
             "data_mode": raw_payload.get("data_mode", "simulated"),
             "batch": {
-                "batch_id": raw_payload.get("batch_id", f"batch-{int(datetime.now(timezone.utc).timestamp())}"),
+                "batch_id": batch_id,
                 "analysis_timestamp": raw_payload.get("analysis_timestamp", raw_payload.get("timestamp", datetime.now(timezone.utc).isoformat())),
-                "total_clusters_analyzed": raw_payload.get("total_clusters_analyzed", 1),
-                "anomalies_detected_count": raw_payload.get("anomalies_detected_count", len(raw_payload.get("investigated_threats", []))),
-                "investigated_threats": raw_payload.get("investigated_threats", raw_payload.get("threats", [])),
+                "total_clusters_analyzed": max(raw_payload.get("total_clusters_analyzed", 1), distinct_clusters),
+                "anomalies_detected_count": len(threats),
+                "investigated_threats": threats,
             },
         }
 
-    threats = formatted_payload.get("batch", {}).get("investigated_threats", [])
     if not threats:
         return
 
-    # Post finding payload to AquaPulse backend endpoint
     req = urllib.request.Request(
         AQUAPULSE_PLATFORM_URL,
         data=json.dumps(formatted_payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": f"investigation:{batch_id}",
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -315,4 +320,4 @@ def investigate(payload: Dict[str, Any]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8002)
