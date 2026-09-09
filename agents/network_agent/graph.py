@@ -7,6 +7,7 @@ from agents.network_agent.nodes.network_llm import NetworkAgent
 from agents.network_agent.nodes.collect_requests import RequestCollector
 from agents.network_agent.nodes.rank_requests import rank_requests
 from agents.network_agent.nodes.group_requests import group_requests_by_zone
+from agents.network_agent.nodes.dispatch_to_response import dispatch_node
 
 class NetworkWorkflowState(TypedDict):
     raw_requests: List[Dict[str, Any]]
@@ -55,11 +56,13 @@ workflow.add_node("collect_requests", collect_node)
 workflow.add_node("rank_requests", rank_node)
 workflow.add_node("group_requests", group_node)
 workflow.add_node("network_agent", agent_node)
+workflow.add_node("dispatch_to_response", dispatch_node)
 workflow.add_edge(START, "collect_requests")
 workflow.add_edge("collect_requests", "rank_requests")
 workflow.add_edge("rank_requests", "group_requests")
 workflow.add_edge("group_requests", "network_agent")
-workflow.add_edge("network_agent", END)
+workflow.add_edge("network_agent", "dispatch_to_response")
+workflow.add_edge("dispatch_to_response", END)
 graph = workflow.compile()
 
 if __name__ == "__main__":

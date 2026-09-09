@@ -20,6 +20,8 @@ class ActuationState(TypedDict, total=False):
     human_override_requested: bool
     human_override_response: Optional[str]
     reasoning_trace: list[str]
+    network_released: bool
+    network_release_status: Optional[str]
     #outputs
     audit_entry: AuditLogEntry
     error: Optional[str]

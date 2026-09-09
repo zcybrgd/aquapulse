@@ -17,9 +17,11 @@ device_reachability_client = DeviceReachabilityClient(network_client)
 qod_client = QodClient(network_client)
 
 DEVICE_ID_MAP: dict[str, str] = {
-    "device-14-valve-A": "+99999991001",       # simulated: has a data connection
-    "device-offline-demo": "+99999991003",     # simulated: has lost connectivity
-    "device-14-valve-A-fail": "+99999991001",  # reachable; actuator sim forces the failure downstream
+    "device-14-valve-A": "+99999991001",
+    "device-offline-demo": "+99999991003",
+    "device-14-valve-A-fail": "+99999991001",
+    "+99999991001": "+99999991001",
+    "+99999991003": "+99999991003",
 }
 
 def get_phone_number(device_id: str) -> str:

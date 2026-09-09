@@ -1,26 +1,27 @@
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Literal
 from langchain_core.tools import tool
-
+import json
 from agents.network_agent.schemas import NetworkDenied, NetworkGrant
 
 @tool
 def emit_grant(
     cluster_id: str,
     incident_id: str,
+    device_id: str,
     severity_tier: str,
     guarantee_type: Literal["QoD", "slice"],
     session_id: str,
     granted_at: str,
     reasoning_trace: str,
     expires_at: Optional[str] = None
-) -> Dict[str, Any]:
+) -> str:
     """Emit the final decision for a request that was successfully allocated a network guarantee (Slice or QoD). 
-    Call this once, after the allocation tool call has returned a result.
-
+    we call this once, after the allocation tool call has returned a result.
     Args:
         cluster_id: Copied verbatim from the input request.
         incident_id: Copied verbatim from the input request.
+        device_id: Copied verbatim from the input request (the phone number used for the allocation). Never invent.
         severity_tier: Copied verbatim from the input request.
         guarantee_type: Network guarantee allocated. Allowed values: 'QoD' or 'slice'.
         session_id: Copied from the allocation tool's result. Never invent.
@@ -38,17 +39,20 @@ def emit_grant(
         reasoning_trace=reasoning_trace,
         expires_at=expires_at
     )
-    return {"status": "GRANTED", "decision": decision.model_dump()}
+    return json.dumps({"status": "GRANTED", "device_id": device_id, "decision": decision.model_dump(mode="json")})
+
+
 
 
 @tool
 def emit_deny(
     cluster_id: str,
     incident_id: str,
+    device_id: str,
     severity_tier: str,
     fallback: Literal["SMS", "none"],
     reasoning_trace: str
-) -> Dict[str, Any]:
+) -> str:
     """Emit the final decision for a request that was denied, either a deliberate Deny/Best-Effort classification, 
     or a failed allocation attempt after retry. Call this once per denied request.
 
@@ -67,4 +71,4 @@ def emit_deny(
         fallback=fallback,
         denied_at=datetime.now(timezone.utc)
     )
-    return {"status": "DENIED", "decision": decision.model_dump()}
+    return json.dumps({"status": "DENIED", "device_id": device_id, "decision": decision.model_dump(mode="json")})

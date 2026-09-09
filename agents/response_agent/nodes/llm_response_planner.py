@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
-from shared.llm_client import get_groq_llm
+from ...shared.llm_client import get_groq_llm
 from ..schemas import ActuationDecision, SeverityTier
 from ..state import ActuationState
 

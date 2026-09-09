@@ -17,6 +17,7 @@ notification_auth_token = os.getenv("NOTIFICATION_AUTH_TOKEN", "Bearer test-toke
 def request_network_slice(
     devices: List[Dict[str, Any]], 
     slice_name: str,
+    incident_context: List[Dict[str, Any]],
     mcc: str = "236",
     mnc: str = "30",
     service_type: int = 1,
@@ -27,6 +28,12 @@ def request_network_slice(
     """
     Creates a 5G Network Slice asynchronously and registers device attachment 
     metadata with the background lifecycle server.
+    Args:
+     incident_context: One entry per device, each containing
+          {"phone_number": str, "incident_id": str, "cluster_id": str,
+                     "severity_tier": int}. Required so the lifecycle watcher can
+            emit a per-incident NetworkGrant/NetworkDenied once the slice
+            resolves. Copy these values verbatim from the input requests
     """
     try:
         formatted_devices = []
@@ -59,7 +66,8 @@ def request_network_slice(
             "customer_name": customer_name,
             "customer_description": customer_description,
             "notification_url": notification_url,
-            "notification_auth_token": notification_auth_token
+           "notification_auth_token": notification_auth_token,
+            "incident_context": incident_context,
         }
         
         try:
@@ -81,6 +89,7 @@ def request_network_slice(
                 "grant_type": "network_slicing",
                 "slice_id": slice_id,
                 "devices": formatted_devices,
+                 "incident_context": incident_context,
                 "error": f"FastAPI webhook server unreachable ({req_err}). Slice auto-reaped to protect tenant queue."
             }
 
@@ -99,6 +108,7 @@ def request_network_slice(
             "grant_type": "network_slicing",
             "slice_id": None,
             "devices": devices,
+             "incident_context": incident_context,
             "error": str(e)
         }
 

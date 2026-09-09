@@ -19,15 +19,24 @@ class NetworkGrant(BaseModel):
     session_id: str
     granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: Optional[datetime] = None
+    reasoning_trace: str = ""
 
 class NetworkDenied(BaseModel):
     #emitted by the second Agent when a network request could not be fulfilled (congestion, rate cap, API failure)
     cluster_id: str
     incident_id: str
     severity_tier: SeverityTier
-    reason: str
+    reason: str = ""  # accepted for backward compat
+    reasoning_trace: str = ""
     fallback: Literal["SMS", "none"] = "SMS"
     denied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("reasoning_trace", mode="before")
+    @classmethod
+    def _mirror_reason(cls, v, info):
+        # her schema calls it reasoning_trace; older internal callers used `reason`.
+        # Keep both populated so nothing downstream breaks either way.
+        return v or info.data.get("reason", "")
 
 class ReachabilityStatus(BaseModel):
     #Result of a Device Reachability API call, made immediately before any command is sent not earlier since a device can go unreachable between detection and action
@@ -57,6 +66,8 @@ class ActuationResult(BaseModel):
     valve_command_confirmed: bool = False
     human_override_requested: bool = False
     human_override_response: Optional[Literal["confirmed", "overridden", "timed_out"]] = None
+    network_released: bool = False
+    network_release_status: Optional[str] = None
     reasoning_trace: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     @field_validator("severity_tier", mode="before")

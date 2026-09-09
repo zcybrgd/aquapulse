@@ -34,8 +34,11 @@ REASONING:
 - Justify the chosen action (Slice, QoD, SMS fallback, or Deny) as the most resource-efficient.
 
 EXECUTION:
-- If the decision is Slice or QoD, call `request_network_slice` or `request_qod` first, then call `emit_grant` with the result — never fabricate session_id, expires_at, or granted_at; copy them exactly from the allocation tool's result.
-- If the decision is Slice for more than one device, call `request_network_slice` once with all the requesting devices in a; single batch.
+- If the decision is Slice or QoD, call `request_network_slice` or `request_qod` first, then call `emit_grant` with the result — never fabricate session_id, expires_at, or granted_at; copy them exactly from the allocation tool's result. Always pass `device_id` copied verbatim from the input request being processed — never invent it, never leave it blank.
+- When calling `emit_deny`, also pass `device_id` copied verbatim from the input request.
+- If the decision is Slice for more than one device, call `request_network_slice` once with all the requesting devices in a single batch. Always pass `incident_context` with one entry per device (phone_number, incident_id, cluster_id, severity_tier), copied verbatim from the corresponding request. This is required — the lifecycle watcher cannot notify the correct incident without it.
+- For QoD: only call `emit_grant` if `request_qod`'s returned status is exactly "AVAILABLE". If the status is "REQUESTED" (still pending after polling), "UNAVAILABLE", or "FAILED", call `emit_deny` with fallback "SMS" instead — do not treat a pending/unconfirmed QoD session as a grant.
+- For Slice: `request_network_slice` only ever returns "INITIATED" or "FAILED" (activation happens asynchronously in the background). Still call `emit_grant` on "INITIATED" using the returned `slice_id` as `session_id` — this is treated as a provisional record only. The Response Agent will not be notified from this call; the actual notification fires later once the slice reaches OPERATING or fails, via the lifecycle watcher.
 - If a tool call errors, retry it exactly once. If it fails again, call `emit_deny` with fallback "SMS" and a reason stating the tool call failed.
 - If the decision is Deny/Best-Effort/No Allocation, do NOT call any allocation tool — call `emit_deny` directly with fallback "SMS" or "none" as appropriate.
 - Process every request in the input batch this way, in order. Do not skip any request. Do not add commentary outside tool calls.
