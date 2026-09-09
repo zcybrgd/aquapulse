@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-
 import numpy as np
 
 from aia.config import (
@@ -79,12 +78,8 @@ def estimate_volume_loss_lpm(state: ClusterInvestigationState) -> float:
 
         Q_loss ≈ Cd × A_leak × sqrt(2 × g × h)
 
-    where h is derived from the pressure drop (psi → meters of head) and
-    A_leak is estimated as a fraction of the pipe cross-section proportional
-    to the pressure drop percentage.
-
-    Returns liters per minute (LPM). This is a rough order-of-magnitude
-    estimate for operator situational awareness, not a precise hydraulic model.
+    Returns liters per minute (LPM). Rough order-of-magnitude estimate for operator
+    situational awareness.
     """
     diameter_mm = state.pipe_diameter_mm or 200.0
     drop_pct = state.pressure_drop_pct
@@ -99,10 +94,10 @@ def estimate_volume_loss_lpm(state: ClusterInvestigationState) -> float:
     pipe_radius_m = (diameter_mm / 2.0) / 1000.0
     pipe_area_m2 = math.pi * pipe_radius_m ** 2
     leak_fraction = min(drop_pct / 100.0, 1.0)
-    leak_area_m2 = pipe_area_m2 * leak_fraction * 0.1  # conservative: 10% of proportional area
+    leak_area_m2 = pipe_area_m2 * leak_fraction * 0.1  # 10% of proportional area
 
-    # Torricelli: v = Cd * sqrt(2 * g * h)
-    cd = 0.62  # discharge coefficient for a sharp-edged orifice
+    # Torricelli equation
+    cd = 0.62
     g = 9.81
     velocity_mps = cd * math.sqrt(2 * g * max(head_m, 0))
     flow_m3ps = leak_area_m2 * velocity_mps
@@ -113,8 +108,6 @@ def assign_segment_metadata(state: ClusterInvestigationState, topology: Topology
     """Section 5.C.1: map the cluster to its physical segment via the local topology cache."""
     segment = topology.get_segment_for_cluster(state.sensor_cluster_id)
     if segment is None:
-        # Unknown segment: treat conservatively as maximum criticality so a
-        # topology-cache miss can never silently downgrade a real threat.
         state.segment_id = f"unknown-{state.sensor_cluster_id}"
         state.criticality_score = 3
         state.proximity_to_reservoir_m = 0.0
@@ -135,34 +128,37 @@ def assign_segment_metadata(state: ClusterInvestigationState, topology: Topology
 def assign_severity_tier(state: ClusterInvestigationState) -> int:
     """
     Reconciled Risk Tiering Matrix (Section 5.C.3) with zone-specific thresholds.
-    Evaluated most-severe-first so overlapping conditions resolve safely.
+    Evaluated hierarchically so physical severity and asset criticality are balanced safely.
     """
     delta_p = state.pressure_drop_pct
     criticality = state.criticality_score or 1
     slope = state.pressure_slope
 
-    # Resolve zone-specific thresholds (falls back to defaults if zone unknown)
+    # Resolve zone-specific thresholds
     thresholds = get_zone_thresholds(state.zone_id)
-    t3_delta = thresholds["tier3_delta_p_pct_min"]
-    t3_slope = thresholds["tier3_pressure_slope_max"]
-    t2_min = thresholds["tier2_delta_p_pct_min"]
-    t2_max = thresholds["tier2_delta_p_pct_max"]
-    t1_max = thresholds["tier1_delta_p_pct_max"]
+    t3_delta = thresholds.get("tier3_delta_p_pct_min", 25.0)
+    t3_slope = thresholds.get("tier3_pressure_slope_max", -1.0)
+    t2_min = thresholds.get("tier2_delta_p_pct_min", 10.0)
 
-    # Emergency override: extreme pressure drop unconditionally triggers Tier 3
-    # regardless of criticality.
-    if delta_p >= TIER3_EMERGENCY_DELTA_P_PCT_MIN and slope < t3_slope:
+    # 1. Tier 3 (High Risk / Immediate Intervention Required):
+    # - Extreme pressure drop (>= 50%) OR
+    # - Major pressure drop (>= t3_delta) on medium/high criticality assets (criticality >= 2) OR
+    # - Major pressure drop (>= t3_delta) with rapid pressure drop rate (slope < t3_slope)
+    if delta_p >= TIER3_EMERGENCY_DELTA_P_PCT_MIN:
+        return 3
+    if delta_p >= t3_delta and (criticality >= 2 or slope < t3_slope):
         return 3
 
-    # Standard Tier 3: all three conditions required.
-    if delta_p >= t3_delta and slope < t3_slope and criticality == TIER3_CRITICALITY_REQUIRED:
-        return 3
-    if (t2_min <= delta_p < t2_max) or criticality == TIER2_CRITICALITY_TRIGGER:
+    # 2. Tier 2 (Moderate Anomaly / Action Required):
+    # - Moderate pressure drop (>= t2_min) OR
+    # - Significant pressure drop (>= t3_delta) on low-criticality asset (criticality == 1) OR
+    # - High-criticality asset (criticality == 3) experiencing any non-minor deviation
+    if delta_p >= t2_min or delta_p >= t3_delta or criticality == 3:
         return 2
-    if delta_p < t1_max and criticality <= TIER1_CRITICALITY_MAX:
-        return 1
-    # Default to Tier 2 -- never silently downgrade to Tier 1.
-    return 2
+
+    # 3. Tier 1 (Low Risk / Minor Deviation / Log Only):
+    # - Minor pressure drop (< t2_min) on low or medium criticality assets
+    return 1
 
 
 def compute_confidence_score(state: ClusterInvestigationState) -> float:
@@ -173,15 +169,14 @@ def compute_confidence_score(state: ClusterInvestigationState) -> float:
     window_len = len(state.window.readings)
     c_telemetry = min(1.0, window_len / EXPECTED_TELEMETRY_WINDOW_LEN)
 
-    # Check api_unavailable or specific API failure flags first
     if state.api_unavailable or (state.reachability_api_unavailable and state.congestion_api_unavailable):
-        c_camara = 0.0  # Total API failure
+        c_camara = 0.0
     elif state.reachability_api_unavailable or state.congestion_api_unavailable:
-        c_camara = 0.5  # One API responded, one failed
+        c_camara = 0.5
     elif state.camara_reachability_status is not None and state.camara_congestion_level is not None:
-        c_camara = 1.0  # Both APIs responded successfully
+        c_camara = 1.0
     else:
-        c_camara = 0.5  # Partial data
+        c_camara = 0.5
 
     c_trend = state.trend_r_squared
 
@@ -195,17 +190,16 @@ def compute_confidence_score(state: ClusterInvestigationState) -> float:
 
 def assess_risk(state: ClusterInvestigationState, topology: TopologyCache) -> ClusterInvestigationState:
     """
-    Runs the full Stage 3 pipeline on a cluster that Stage 2 has already
-    classified. Computes physical deviations, maps segment metadata (including
-    zone and pipe diameter), assigns severity tier using zone-specific
-    thresholds, and estimates volume loss for operator situational awareness.
+    Runs the full Stage 3 pipeline on a cluster that Stage 2 has already classified.
+    Computes physical deviations, maps segment metadata, assigns severity tier,
+    and estimates volume loss for operator situational awareness.
     """
     compute_physical_deviations(state)
     assign_segment_metadata(state, topology)
 
     if state.classification == Classification.CONFIRMED_INSTRUMENT_FAULT:
         state.is_stale_pre_outage_data = True
-        state.severity_tier = 1  # maintenance dispatch path, not a physical tier
+        state.severity_tier = 1
     elif state.classification == Classification.LIKELY_CONNECTIVITY_ARTIFACT:
         state.severity_tier = 1
     elif state.classification == Classification.INSUFFICIENT_DATA:
