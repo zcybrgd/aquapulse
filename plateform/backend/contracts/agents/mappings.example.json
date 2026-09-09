@@ -1,11 +1,29 @@
 [
   {
-    "provider": "investigation_agent",
-    "entity_type": "sensor_cluster",
-    "external_id": "cluster-example-001",
-    "internal_entity_type": "detection",
-    "internal_public_id": "DET-000001",
+    "provider": "response_agent",
+    "entity_type": "incident",
+    "external_id": "INC-1833",
+    "internal_entity_type": "incident",
+    "internal_public_id": "INC-1833",
     "enabled": true,
-    "metadata": {"note": "Example only. Do not guess NEOM demo IDs."}
+    "metadata": {"note": "Pressure anomaly on Jeddah North feeder, tier_2"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "incident",
+    "external_id": "INC-1835",
+    "internal_entity_type": "incident",
+    "internal_public_id": "INC-1835",
+    "enabled": true,
+    "metadata": {"note": "Confirmed leak on Harbour transfer main, tier_3"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "incident",
+    "external_id": "INC-1841",
+    "internal_entity_type": "incident",
+    "internal_public_id": "INC-1841",
+    "enabled": true,
+    "metadata": {"note": "Sensor connectivity degradation in Al Ain North, tier_2"}
   }
 ]

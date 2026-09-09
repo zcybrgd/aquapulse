@@ -11,7 +11,7 @@ class AquaPulsePlatformClient:
         self,
         base_url: str = "http://127.0.0.1:8000",
         timeout_seconds: float = 5.0,
-        use_real_ingest: bool = False,  
+        use_real_ingest: bool = True,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
@@ -26,17 +26,22 @@ class AquaPulsePlatformClient:
     def send(self, payload: Dict[str, Any], incident_id: str) -> Optional[Dict[str, Any]]:
         url = self._endpoint()
         try:
-            response = self._session.post(url, json=payload, timeout=self.timeout_seconds)
-            if response.status_code == 404 and not self.use_real_ingest:
+            headers = {"X-Idempotency-Key": f"response:{payload['result_id']}"}
+            response = self._session.post(url, json=payload, headers=headers, timeout=self.timeout_seconds)
+            if response.status_code == 404:
                 logger.error(
-                    "aquapulse_endpoint_not_implemented incident_id=%s url=%s",
+             "aquapulse_endpoint_404 incident_id=%s url=%s (ingest route not live yet?)",
                     incident_id, url,
                 )
                 return None
             response.raise_for_status()
             body = response.json()
             if self.use_real_ingest:
-                logger.info("aquapulse_ingest_ok incident_id=%s run_id=%s", incident_id, body.get("run_id"))
+                logger.info(
+                    "aquapulse_ingest_ok incident_id=%s run_id=%s created=%s duplicates=%s unmapped_ids=%s",
+                    incident_id, body.get("run_id"), body.get("created"),
+                    body.get("duplicates"), body.get("unmapped_ids"),
+                )
             else:
                 logger.info(
                     "aquapulse_validate_result incident_id=%s valid=%s errors=%s",
