@@ -62,7 +62,7 @@ def _make_threat(
 SCENARIOS = {
     "qod": lambda: [
         _make_threat(
-            incident_id=f"incident-{uuid.uuid4()}",
+           incident_id="INC-1833",
             severity_tier=2,
             criticality_score=3,
             confidence=0.85,
@@ -70,15 +70,15 @@ SCENARIOS = {
     ],
     "slice": lambda: [
         _make_threat(
-            incident_id=f"incident-{uuid.uuid4()}",
+            incident_id=f"INC-1833",
             severity_tier=3,
             criticality_score=5,
             confidence=0.97,
             device_id="+99999991000",
-            network_degradation=True,
+            network_degradation=True,  
         ),
         _make_threat(
-            incident_id=f"incident-{uuid.uuid4()}",
+            incident_id=f"INC-1841",
             severity_tier=3,
             criticality_score=5,
             confidence=0.95,
@@ -88,7 +88,7 @@ SCENARIOS = {
     ],
     "deny": lambda: [
         _make_threat(
-            incident_id=f"incident-{uuid.uuid4()}",
+            incident_id=f"INC-1842",
             severity_tier=1,
             criticality_score=1,
             confidence=0.5,
