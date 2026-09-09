@@ -3,26 +3,6 @@
 # ============================================================================
 # AquaPulse Core Stack Launcher
 # ============================================================================
-#
-# Starts:
-#   - Platform Docker stack
-#   - Water pipeline testbed Docker stack
-#   - Platform backend
-#   - Investigation / AIA agent
-#   - Network Management / NMA agent
-#   - Platform frontend
-#
-# Usage:
-#   ./run.sh
-#   ./run.sh --no-install
-#
-# Stop local development services:
-#   Ctrl+C
-#
-# Stop Docker stacks separately:
-#   docker compose -f plateform/docker-compose.yml down
-#   docker compose -f water-pipeline-testbed/docker-compose.yml down
-# ============================================================================
 
 set -Eeuo pipefail
 
@@ -44,6 +24,7 @@ AGENT_DIR="$ROOT_DIR/agents/investigation_agent"
 
 NETWORK_AGENT_DIR="$ROOT_DIR/agents/network_agent"
 NETWORK_AGENT_PORT=9001
+NETWORK_RELEASE_PORT=8004
 
 PLATFORM_COMPOSE="$PLATFORM_DIR/docker-compose.yml"
 TESTBED_COMPOSE="$TESTBED_DIR/docker-compose.yml"
@@ -380,6 +361,15 @@ start_service \
     --port "$NETWORK_AGENT_PORT" \
     --reload
 
+# Network Management Agent Release Server
+start_service \
+    "Network Agent Release Server" \
+    "$NETWORK_AGENT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" uvicorn release_server:app \
+    --host 0.0.0.0 \
+    --port "$NETWORK_RELEASE_PORT" \
+    --reload
+
 # Network Management Agent Listener (Redis Bridge)
 start_service \
     "Network Agent Listener" \
@@ -414,6 +404,9 @@ ${GREEN}AIA Investigation Agent:${RESET}
 
 ${GREEN}Network Management Agent Webhook:${RESET}
     http://localhost:${NETWORK_AGENT_PORT}
+
+${GREEN}Network Agent Release Server:${RESET}
+    http://localhost:${NETWORK_RELEASE_PORT}
 
 ${GREEN}Platform Frontend:${RESET}
     http://localhost:${FRONTEND_PORT}
@@ -476,9 +469,6 @@ trap cleanup SIGINT SIGTERM
 # ----------------------------------------------------------------------------
 # 10. Monitor Services
 # ----------------------------------------------------------------------------
-
-# Wait for any child process.
-# If one unexpectedly exits, stop the entire local stack.
 
 while true; do
 

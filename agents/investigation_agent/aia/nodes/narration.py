@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import json
+import logging
+import requests
+
 from aia.config import LLM_BASE_URL, LLM_MODEL
 from aia.models import ClusterInvestigationState, sanitize_identifier
+
+logger = logging.getLogger("aia.narration")
 
 NARRATION_SYSTEM_PROMPT = """You are the read-only narration layer of the AquaPulse Anomaly Investigation Agent (AIA).
 Your sole task is to write a concise, professional "Operator Justification Memo" explaining the root cause of an
@@ -20,7 +26,9 @@ STYLE:
 - Plain, factual, operational tone. No filler, no enthusiasm, no hedging language ("might", "could suggest").
 - Write in English regardless of the language of the input field values.
 - Write as a single continuous paragraph. No markdown, no bullet points, no line breaks within or between
-  sentences -- sentences run on in normal prose, separated only by spaces.
+  sentences -- sentences run on in normal prose, separated strictly by spaces. Always maintain clear space
+  boundaries between words, numbers, and technical terms (e.g., write "confirmed_anomaly with severity tier 2"
+  and "based on the significant pressure drop", never concatenate words without spaces).
 
 OUTPUT FORMAT:
 2-4 sentences in one unbroken paragraph, covering, in this order:
@@ -42,25 +50,26 @@ def _build_user_prompt(state: ClusterInvestigationState) -> str:
     valve_id = sanitize_identifier(state.associated_valve_id or "unknown")
 
     current = state.window.readings[-1]
+    classification_str = (
+        state.classification.value if state.classification else "unknown"
+    )
+
     volume_loss_line = (
         f"- estimated_volume_loss_lpm: {state.estimated_volume_loss_lpm:.1f}"
         if state.estimated_volume_loss_lpm is not None
         else "- estimated_volume_loss_lpm: N/A"
     )
     detection_reason = state.detection_reason or "N/A"
-    # api_error_detail is free text from an external API response (CAMARA/Mistral
-    # error bodies), not a validated identifier -- it can't go through
-    # sanitize_identifier. Truncate defensively so a verbose or malformed
-    # upstream error can't bloat the prompt or carry injected instructions.
     api_error_detail = (state.api_error_detail or "N/A")[:200]
     retry_line = (
         f"\nRetry status:\n- consecutive_insufficient_data_cycles: {state.consecutive_insufficient_data_cycles}"
         if state.consecutive_insufficient_data_cycles > 0
         else ""
     )
+
     return f"""Investigated cluster: {cluster_id}
 Segment: {segment_id}
-Classification: {state.classification.value if state.classification else 'unknown'}
+Classification: {classification_str}
 Severity tier: {state.severity_tier}
 Confidence score: {state.confidence_score}
 
@@ -90,44 +99,39 @@ Criticality:
 Write the Operator Justification Memo now."""
 
 
-def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, model: str) -> str:
-    import requests
-    import json
-    
+def narrate_with_llm(
+    state: ClusterInvestigationState, client_api_key: str, model: str
+) -> str:
     url = LLM_BASE_URL
     headers = {
         "Authorization": f"Bearer {client_api_key}",
         "Content-Type": "application/json",
     }
-    
+
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": NARRATION_SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_prompt(state)}
-        ]
+            {"role": "user", "content": _build_user_prompt(state)},
+        ],
     }
-    
-    # Bounded timeout: narration must never be the reason the pipeline blows
-    # its latency budget (Section 1/9). A slow/hanging LLM call falls through
-    # to the deterministic fallback via the caller's except block.
-    response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=8.0)
-    
+
+    response = requests.post(
+        url, headers=headers, data=json.dumps(payload), timeout=8.0
+    )
+
     if response.status_code == 200:
         data = response.json()
-        text = data['choices'][0]['message']['content'].strip()
-        # Defensive normalization: even with an explicit single-paragraph
-        # instruction, some models occasionally break lines anyway. Collapse
-        # any whitespace run (including newlines) into a single space so the
-        # memo is always one continuous paragraph regardless of model output.
+        text = data["choices"][0]["message"]["content"].strip()
+        # Defensive normalization: collapse any whitespace run (including newlines)
+        # into a single space while ensuring proper spacing between tokens.
         return " ".join(text.split())
     else:
-        # Surface rate-limit diagnostics: Retry-After (or X-RateLimit-* headers,
-        # which Groq does send) tells us how severe the throttling actually is,
-        # which plain body text doesn't.
         retry_after = response.headers.get("Retry-After")
         rate_limit_headers = {
-            k: v for k, v in response.headers.items() if "ratelimit" in k.lower() or k.lower() == "retry-after"
+            k: v
+            for k, v in response.headers.items()
+            if "ratelimit" in k.lower() or k.lower() == "retry-after"
         }
         raise Exception(
             f"Groq API Error: {response.status_code} - {response.text} "
@@ -136,9 +140,10 @@ def narrate_with_llm(state: ClusterInvestigationState, client_api_key: str, mode
 
 
 def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:
-
     current = state.window.readings[-1]
-    classification = state.classification.value if state.classification else "unknown"
+    classification = (
+        state.classification.value if state.classification else "unknown"
+    )
 
     volume_loss_clause = (
         f", estimated volume loss {state.estimated_volume_loss_lpm:.1f} L/min"
@@ -161,25 +166,27 @@ def narrate_deterministic_fallback(state: ClusterInvestigationState) -> str:
         f"(api_unavailable={state.api_unavailable}{error_detail_clause})."
     )
     rationale_sentence = (
-        f"This supports a classification of {classification} at severity tier {state.severity_tier} "
-        f"with confidence {state.confidence_score:.2f}."
+        f"This supports a classification of {classification} with severity tier {state.severity_tier} "
+        f"based on confidence score {state.confidence_score:.2f}."
     )
+
     if state.consecutive_insufficient_data_cycles > 0:
         rationale_sentence = (
-            rationale_sentence[:-1]
-            + f"; this is consecutive insufficient_data cycle {state.consecutive_insufficient_data_cycles}."
+            f"{rationale_sentence[:-1]}; this is consecutive insufficient_data cycle "
+            f"{state.consecutive_insufficient_data_cycles}."
         )
+
+    # Clean sentence assembly ensuring strict space separation
     return f"{detection_sentence} {network_sentence} {rationale_sentence}"
 
 
-def narrate(state: ClusterInvestigationState, llm_client=None, model: str = LLM_MODEL) -> str:
+def narrate(
+    state: ClusterInvestigationState, llm_client=None, model: str = LLM_MODEL
+) -> str:
     if llm_client is not None:
         try:
             return narrate_with_llm(state, llm_client, model)
         except Exception as e:
-            import logging
-            logging.getLogger("aia").error(f"LLM Narration failed, using fallback. Error: {e}")
-            # Narration failures must never block a safety-critical payload
-            # from reaching the NMA -- fall back to the deterministic memo.
+            logger.error("LLM Narration failed, using fallback. Error: %s", e)
             return narrate_deterministic_fallback(state)
     return narrate_deterministic_fallback(state)
