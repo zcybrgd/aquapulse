@@ -4,6 +4,8 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Optional
 
 from aia.clients.camara_client import CamaraClient
 from aia.clients.storage import TelemetryStore
@@ -25,10 +27,18 @@ from aia.models import (
 
 logger = logging.getLogger("aia")
 
+# Flexible import for shared rate-limited LLM client
+try:
+    from agents.shared.llm_client import get_groq_llm
+except ImportError:
+    try:
+        from shared.llm_client import get_groq_llm
+    except ImportError:
+        get_groq_llm = None
+
 
 @dataclass
 class RetryTracker:
-
     consecutive_cycles: dict[str, int] = field(default_factory=dict)
 
     def get(self, cluster_id: str) -> int:
@@ -42,6 +52,43 @@ class RetryTracker:
         self.consecutive_cycles.pop(cluster_id, None)
 
 
+@dataclass
+class ActiveIncidentTracker:
+    """
+    Tracks active leak incidents per cluster to suppress duplicate alerts and
+    prevent downstream LLM rate-limit exhaustion during ongoing leaks.
+    """
+
+    active_incidents: dict[str, float] = field(default_factory=dict)
+    normal_counts: dict[str, int] = field(default_factory=dict)
+    cooldown_seconds: float = 300.0  # 5-minute cooldown before re-alerting on same cluster
+
+    def is_suppressed(self, cluster_id: str) -> bool:
+        if cluster_id not in self.active_incidents:
+            return False
+        elapsed = time.monotonic() - self.active_incidents[cluster_id]
+        return elapsed < self.cooldown_seconds
+
+    def mark_active(self, cluster_id: str) -> None:
+        self.active_incidents[cluster_id] = time.monotonic()
+        self.normal_counts[cluster_id] = 0
+
+    def record_normal(self, cluster_id: str) -> None:
+        if cluster_id in self.active_incidents:
+            self.normal_counts[cluster_id] = self.normal_counts.get(cluster_id, 0) + 1
+            if self.normal_counts[cluster_id] >= 2:
+                logger.info(
+                    "Cluster %s telemetry returned to normal; clearing active incident state.",
+                    cluster_id,
+                )
+                self.active_incidents.pop(cluster_id, None)
+                self.normal_counts.pop(cluster_id, None)
+
+    def clear(self, cluster_id: str) -> None:
+        self.active_incidents.pop(cluster_id, None)
+        self.normal_counts.pop(cluster_id, None)
+
+
 class AnomalyInvestigationAgent:
     def __init__(
         self,
@@ -51,12 +98,10 @@ class AnomalyInvestigationAgent:
         camara_client: CamaraClient,
         leak_detector=None,
         llm_client=None,
-        llm_model: str = "anthropic/claude-3.5-sonnet",
-        retry_tracker: RetryTracker | None = None,
-        # Sequential by default: parallel clusters each fire a Stage 4 Mistral
-        # call, and the free/dev Mistral tier's rate limit is low enough that
-        # even 2 concurrent narration calls can trigger a 429. Raise this only
-        # if your Mistral tier's RPS budget can absorb concurrent narration.
+        llm_model: str = "openai/gpt-oss-20b",
+        retry_tracker: Optional[RetryTracker] = None,
+        incident_tracker: Optional[ActiveIncidentTracker] = None,
+        cooldown_seconds: float = 300.0,
         max_workers: int = 4,
     ):
         from aia.graph.builder import build_investigation_graph
@@ -67,7 +112,18 @@ class AnomalyInvestigationAgent:
         self.camara_client = camara_client
         self.leak_detector = leak_detector
         self.retry_tracker = retry_tracker or RetryTracker()
+        self.incident_tracker = incident_tracker or ActiveIncidentTracker(
+            cooldown_seconds=cooldown_seconds
+        )
         self._max_workers = max_workers
+
+        # Default to central rate-limited LLM client if none explicitly injected
+        if llm_client is None and get_groq_llm is not None:
+            try:
+                llm_client = get_groq_llm()
+            except Exception as exc:
+                logger.warning("Could not automatically initialize shared rate-limited LLM: %s", exc)
+
         self._graph = build_investigation_graph(
             camara_client=camara_client,
             topology=topology,
@@ -80,23 +136,33 @@ class AnomalyInvestigationAgent:
     def _run_detection(self, batch: StreamingBatch) -> tuple[list[TelemetryWindow], int]:
         suspicious: list[TelemetryWindow] = []
         for window in batch.telemetry_windows:
-            # Look up pipe metadata from topology for the ML model
-            segment = self.topology.get_segment_for_cluster(window.sensor_cluster_id)
+            cluster_id = window.sensor_cluster_id
+            segment = self.topology.get_segment_for_cluster(cluster_id)
             pipe_diameter = segment.pipe_diameter_mm if segment else 200.0
-            pipe_material = "HDPE"  # default; could be extended in SegmentTopology
-            pipe_age = 10           # default; could be extended in SegmentTopology
+            pipe_material = "HDPE"
+            pipe_age = 10
 
             result = detect_and_learn(
-                window, self.baseline_store,
+                window,
+                self.baseline_store,
                 leak_detector=self.leak_detector,
                 pipe_diameter_mm=pipe_diameter,
                 pipe_age_years=pipe_age,
                 pipe_material=pipe_material,
             )
             if result.is_suspicious:
-                logger.info("Cluster %s flagged suspicious: %s", window.sensor_cluster_id, result.reason)
-                suspicious.append(window)
+                if self.incident_tracker.is_suppressed(cluster_id):
+                    logger.info(
+                        "Cluster %s flagged suspicious, but suppressed (active leak under investigation/cooldown).",
+                        cluster_id,
+                    )
+                    self.telemetry_store.archive_normal_window(window)
+                else:
+                    logger.info("Cluster %s flagged suspicious: %s", cluster_id, result.reason)
+                    suspicious.append(window)
+                    self.incident_tracker.mark_active(cluster_id)
             else:
+                self.incident_tracker.record_normal(cluster_id)
                 self.telemetry_store.archive_normal_window(window)
         return suspicious, len(batch.telemetry_windows)
 
@@ -133,7 +199,7 @@ class AnomalyInvestigationAgent:
         Each cluster gets its own LangGraph invocation (Stages 2-4).
         """
         if len(windows) <= 1:
-            return [self._investigate_cluster(w) for w in windows]
+            return [self._investigate_cluster(w) for w in windows] if windows else []
 
         results: list[ClusterInvestigationState] = []
         with ThreadPoolExecutor(max_workers=min(self._max_workers, len(windows))) as executor:
@@ -150,7 +216,6 @@ class AnomalyInvestigationAgent:
                         "Investigation failed for cluster %s", window.sensor_cluster_id
                     )
         return results
-
 
     @staticmethod
     def _to_investigated_threat(state: ClusterInvestigationState) -> InvestigatedThreat:
@@ -195,7 +260,7 @@ class AnomalyInvestigationAgent:
 
         suspicious_windows, total_clusters = self._run_detection(batch)
 
-        # Process suspicious clusters in parallel (multi-instance)
+        # Process suspicious clusters in parallel
         investigated_states = self._investigate_clusters_parallel(suspicious_windows)
 
         if check_platform_wide_outage(investigated_states):
@@ -217,7 +282,13 @@ class AnomalyInvestigationAgent:
         threats = [self._to_investigated_threat(s) for s in investigated_states]
 
         elapsed = time.monotonic() - start
-        logger.info("Batch %s processed in %.3fs (%d/%d flagged)", batch.batch_id, elapsed, len(threats), total_clusters)
+        logger.info(
+            "Batch %s processed in %.3fs (%d/%d flagged)",
+            batch.batch_id,
+            elapsed,
+            len(threats),
+            total_clusters,
+        )
 
         return AIABatchOutputPayload(
             batch_id=batch.batch_id,

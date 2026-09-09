@@ -13,8 +13,8 @@
 #   - Platform frontend
 #
 # Usage:
-#   ./start.sh
-#   ./start.sh --no-install
+#   ./run.sh
+#   ./run.sh --no-install
 #
 # Stop local development services:
 #   Ctrl+C
@@ -133,9 +133,9 @@ while [[ $# -gt 0 ]]; do
 AquaPulse Core Stack Launcher
 
 Usage:
-    ./start.sh                 Start everything
-    ./start.sh --no-install    Skip Python dependency installation
-    ./start.sh --help          Show this help message
+    ./run.sh                 Start everything
+    ./run.sh --no-install    Skip Python dependency installation
+    ./run.sh --help          Show this help message
 
 Services:
     Platform Backend    http://localhost:${BACKEND_PORT}
@@ -386,7 +386,6 @@ start_service \
     "$ROOT_DIR" \
     env PYTHONPATH="$ROOT_DIR" python "$NETWORK_AGENT_DIR/runner.py"
 
-
 # Platform frontend
 start_service \
     "Platform Frontend" \
@@ -463,12 +462,11 @@ cleanup() {
     success "Local AquaPulse services stopped."
 
     echo
-    warning "Docker containers were NOT stopped."
-    echo "To stop them manually:"
-    echo
-    echo "  docker compose -f plateform/docker-compose.yml down"
-    echo "  docker compose -f water-pipeline-testbed/docker-compose.yml down"
-    echo
+    log "Stopping Docker stacks..."
+    docker compose -f "$PLATFORM_COMPOSE" down --remove-orphans || true
+    docker compose -f "$TESTBED_COMPOSE" down --remove-orphans || true
+
+    success "AquaPulse stack shutdown complete."
 
     exit 0
 }

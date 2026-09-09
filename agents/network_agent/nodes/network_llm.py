@@ -1,20 +1,21 @@
+from __future__ import annotations
+
+import logging
+from dotenv import load_dotenv
 from langchain.agents import create_agent
-from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
+
+from agents.shared.llm_client import get_groq_llm
 from agents.network_agent.nodes.tools.emit_output import emit_deny, emit_grant
 from agents.network_agent.nodes.tools.request_qod import request_qod
 from agents.network_agent.nodes.tools.request_slicing import request_network_slice
 from agents.network_agent.nodes.tools.check_congestion import check_congestion
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
-api_key = os.getenv("GROQ_API_KEY")
+logger = logging.getLogger(__name__)
 
-llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0, api_key=api_key)
-
-tools = [check_congestion, request_qod, request_network_slice, emit_grant, emit_deny]
+TOOLS = [check_congestion, request_qod, request_network_slice, emit_grant, emit_deny]
 
 SYSTEM_PROMPT = """You are the Autonomous Network Quality Orchestrator for AquaPulse (MENA Water Pipeline Infrastructure).
 
@@ -44,13 +45,20 @@ EXECUTION:
 - Process every request in the input batch this way, in order. Do not skip any request. Do not add commentary outside tool calls.
 """
 
+
 class NetworkAgent:
-    def __init__(self):
+    def __init__(self, llm=None):
+        """
+        Initializes the NetworkAgent using the central rate-limited LLM factory.
+        Allows injecting a custom LLM instance for testing.
+        """
+        self.llm = llm or get_groq_llm()
         self.agent = create_agent(
-            model=llm,
-            tools=tools,
-            system_prompt=SYSTEM_PROMPT
+            model=self.llm,
+            tools=TOOLS,
+            system_prompt=SYSTEM_PROMPT,
         )
 
     def run(self, input_text: str):
+        logger.info("Executing NetworkAgent orchestration step")
         return self.agent.invoke([HumanMessage(content=input_text)])

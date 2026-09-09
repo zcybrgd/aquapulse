@@ -1,6 +1,7 @@
-
 from __future__ import annotations
 
+import logging
+from typing import Optional
 from langgraph.graph import END, StateGraph
 
 from aia.clients.camara_client import CamaraClient
@@ -9,6 +10,16 @@ from aia.models import ClusterInvestigationState
 from aia.nodes.investigation import investigate
 from aia.nodes.narration import narrate
 from aia.nodes.risk import assess_risk
+
+try:
+    from agents.shared.llm_client import get_groq_llm
+except ImportError:
+    try:
+        from shared.llm_client import get_groq_llm
+    except ImportError:
+        get_groq_llm = None
+
+logger = logging.getLogger("aia.graph.builder")
 
 
 def _investigate_node_factory(camara_client: CamaraClient):
@@ -34,8 +45,19 @@ def build_investigation_graph(
     camara_client: CamaraClient,
     topology: TopologyCache,
     llm_client=None,
-    model: str = "anthropic/claude-3.5-sonnet",
+    model: str = "openai/gpt-oss-20b",
 ):
+    """
+    Builds the LangGraph investigation workflow.
+    Ensures fallback to the centralized rate-limited LLM client if none is provided.
+    """
+    if llm_client is None and get_groq_llm is not None:
+        try:
+            llm_client = get_groq_llm(model=model)
+            logger.debug("Auto-initialized shared rate-limited ChatGroq instance in builder graph.")
+        except Exception as exc:
+            logger.warning("Could not auto-initialize shared rate-limited LLM in build_investigation_graph: %s", exc)
+
     graph = StateGraph(ClusterInvestigationState)
 
     graph.add_node("investigate", _investigate_node_factory(camara_client))
