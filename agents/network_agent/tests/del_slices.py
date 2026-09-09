@@ -7,7 +7,7 @@ load_dotenv()
 
 nac_client = NetworkAsCodeApi(
     rapidapi_host=os.getenv("RAPIDAPI_HOST"),
-    api_key=os.getenv("NOKIA_API_KEY")
+    api_key=os.getenv("RAPIDAPI_KEY")
 )
 
 def _get_state(slice_obj):

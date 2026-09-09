@@ -1,27 +1,56 @@
 import json
+import os
 from typing import Dict, Any
 from langchain_core.tools import tool
 from agents.network_agent.camara_api import camara_service
+from dotenv import load_dotenv
+from agents.network_agent.camara_api import camara_service
+
+load_dotenv()
 
 @tool
-def delete_network_slice(slice_id: str, max_poll_seconds: int = 180) -> Dict[str, Any]:
+def delete_slice(
+    phone_number: str,
+    slice_id: str
+) -> Dict[str, Any]:
     """
-    Deallocates and deletes a 5G network slice.
-    If the slice is currently OPERATING, it safely deactivates it first,
-    polls until it transitions back to AVAILABLE, and then removes it.
-
-    Args:
-        slice_id (str): Name or ID of the network slice to delete.
-        max_poll_seconds (int): Maximum time in seconds to wait for deactivation (default: 180s).
+    Detaches a device from a 5G network slice after an incident is resolved.
     """
-    return camara_service.delete_network_slice(
-        slice_id=slice_id, 
-        max_poll_seconds=max_poll_seconds
-    )
+    slice_id = slice_id or os.getenv("PREPROVISIONED_SLICE_ID", "aquapulse-critical-slice")
+    print(f"\n[Detach Tool] Searching attachments for phone '{phone_number}' on slice '{slice_id}'...")
+    all_attachments_resp = camara_service.get_all_attachments()
+    if all_attachments_resp.get("status") != "SUCCESS":
+        return {
+            "status": "FAILED",
+            "phone_number": phone_number,
+            "slice_id": slice_id,
+            "error": f"Failed to retrieve attachments: {all_attachments_resp.get('error')}"
+        }
 
+    attachments = all_attachments_resp.get("attachments", [])
+    def matches(att):
+        try:
+            return att.resource.slice_id == slice_id and att.resource.device.phone_number == phone_number
+        except AttributeError:
+            return False
 
-if __name__ == "__main__":
-    print("Deleting slice ...\n")
-    result = delete_network_slice.invoke({"slice_id": "zone-47491908-critical"})
-    print("\nFinal Result:")
-    print(json.dumps(result, indent=2))
+    target_nac_resource_id = next((att.nac_resource_id for att in attachments if matches(att)), None)
+
+    if not target_nac_resource_id:
+        return {
+            "status": "NOT_FOUND",
+            "phone_number": phone_number,
+            "slice_id": slice_id,
+            "message": f"No active attachment found for device '{phone_number}' on slice '{slice_id}'."
+        }
+    
+    print(f"[Detach Tool] Found attachment ID '{target_nac_resource_id}'. Detaching...")
+    detach_result = camara_service.detach_device_from_slice(device_id=target_nac_resource_id)
+
+    return {
+        "status": detach_result.get("status"),
+        "phone_number": phone_number,
+        "slice_id": slice_id,
+        "nac_resource_id": target_nac_resource_id,
+        "response": detach_result
+    }

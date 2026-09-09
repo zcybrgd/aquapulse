@@ -190,8 +190,18 @@ success "Project structure looks valid."
 
 section "2. Checking required tools"
 
+PYTHON_CMD=""
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+else
+    error "Required command not found: python3 or python"
+    exit 1
+fi
+success "Python executable found: $(command -v "$PYTHON_CMD")"
+
 REQUIRED_COMMANDS=(
-    python3
     docker
     npm
 )
@@ -224,7 +234,7 @@ if [[ ! -d "$VENV_DIR" ]]; then
     log "Virtual environment not found."
     log "Creating: $VENV_DIR"
 
-    python3 -m venv "$VENV_DIR"
+    "$PYTHON_CMD" -m venv "$VENV_DIR"
 
     success "Virtual environment created."
 else
@@ -232,7 +242,14 @@ else
 fi
 
 # shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
+if [[ -f "$VENV_DIR/bin/activate" ]]; then
+    source "$VENV_DIR/bin/activate"
+elif [[ -f "$VENV_DIR/Scripts/activate" ]]; then
+    source "$VENV_DIR/Scripts/activate"
+else
+    error "Could not find virtual environment activation script in $VENV_DIR"
+    exit 1
+fi
 
 log "Python: $(python --version)"
 log "Environment: $VIRTUAL_ENV"
@@ -352,15 +369,6 @@ start_service \
     --port "$AGENT_PORT" \
     --reload
 
-# Network Management Agent Webhook Server
-start_service \
-    "Network Agent Webhook" \
-    "$NETWORK_AGENT_DIR" \
-    env PYTHONPATH="$ROOT_DIR" uvicorn webhook_server:app \
-    --host 0.0.0.0 \
-    --port "$NETWORK_AGENT_PORT" \
-    --reload
-
 # Network Management Agent Release Server
 start_service \
     "Network Agent Release Server" \
@@ -401,9 +409,6 @@ ${GREEN}Testbed Dashboard:${RESET}
 
 ${GREEN}AIA Investigation Agent:${RESET}
     http://localhost:${AGENT_PORT}
-
-${GREEN}Network Management Agent Webhook:${RESET}
-    http://localhost:${NETWORK_AGENT_PORT}
 
 ${GREEN}Network Agent Release Server:${RESET}
     http://localhost:${NETWORK_RELEASE_PORT}
