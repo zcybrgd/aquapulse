@@ -11,7 +11,7 @@ load_dotenv()
 
 logger = logging.getLogger("NMA.Tools.RequestQoD")
 
-DEFAULT_APP_SERVER_IPV4 = os.getenv("APP_SERVER_IPV4", "10.0.0.1")
+DEFAULT_APP_SERVER_IPV4 = os.getenv("APP_SERVER_IPV4", "233.252.0.2")
 
 # Map cluster IDs to CAMARA test MSISDN numbers
 
@@ -117,15 +117,3 @@ def request_qod(
             "mocked": True,
             "info": f"Mocked allocation due to exception: {e}"
         }
-
-
-if __name__ == "__main__":
-    test_payload = {
-        "device_id": "cluster-desert-043",
-        "qos_profile": "QOS_L",
-        "duration_seconds": 3600,
-        "wait_for_allocation": True,
-        "max_wait_seconds": 10
-    }
-    result = request_qod.invoke(test_payload)
-    print(result)

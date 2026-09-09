@@ -1,7 +1,5 @@
 import time
 
-# Mechanisms to be changed according to how the requests are gonna be collected and stored
-# Could be that this mechanism wouldn't even be managed here, but we just collect the requests
 class RequestCollector:
     def __init__(self, max_batch_size: int = 10, max_wait_time: float = 2.0):
         self.max_batch_size = max_batch_size

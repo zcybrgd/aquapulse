@@ -134,12 +134,11 @@ class CamaraService:
         slice_name: str,
         mcc: str = "236",
         mnc: str = "30",
-        service_type: int = 1,
+        service_type: int = 2,  # URLLC
         differentiator: str = "AUTO",
         notification_url: str = "",
         notification_auth_token: str = ""
     ) -> Any:
-        """Low-level method to request slice creation via SDK."""
         clean_name = re.sub(r'[^a-zA-Z0-9-]', '', slice_name) or f"slice-{int(time.time())}"
         
         if not differentiator or differentiator.upper() in ["AUTO", "000001", "DEFAULT", "NONE", "NULL", ""]:
@@ -154,22 +153,97 @@ class CamaraService:
         )
         return slice_obj, clean_name, differentiator
 
+    def get_slice(self, slice_id: str) -> Any:
+        """Retrieves slice data object by slice_id."""
+        return self.client.slice.get_slice(slice_id)
+
+    def get_slice_state(self, slice_id: str) -> str:
+        """Helper to get current state (e.g. AVAILABLE, OPERATING) of a slice."""
+        slice_data = self.get_slice(slice_id)
+        if isinstance(slice_data, dict):
+            return slice_data.get("state", "UNKNOWN")
+        return getattr(slice_data, "state", "UNKNOWN")
+
+    def activate_slice(self, slice_id: str) -> Any:
+        """Activates a slice in AVAILABLE state so it transitions to OPERATING."""
+        return self.client.slice.activate(slice_id)
+
+    def attach_device_to_slice(
+        self,
+        slice_id: str,
+        device: Dict[str, Any],
+        customer_name: str = "AquaPulse Customer",
+        customer_description: str = "Emergency Device Slice Attachment",
+    ) -> Any:
+        payload = {
+            "device": device,
+            "slice_id": slice_id,
+            "customer": {
+                "name": customer_name,
+                "description": customer_description
+            }
+        }
+        return self.client.slice.attach_device(**payload)
+
+    def detach_device_from_slice(self, device_id: str) -> Dict[str, Any]:
+        """
+        Detaches a device or application from a slice using its attachment resource ID.
+        """
+        try:
+            response = self.client.slice.delete_device_attachment(resource_id=device_id)
+            return {
+                "status": "DETACHED",
+                "resource_id": device_id,
+                "response": str(response)
+            }
+        except Exception as e:
+            return {
+                "status": "FAILED",
+                "resource_id": device_id,
+                "error": str(e)
+            }
+
+    def get_attachment(self, resource_id: str) -> Dict[str, Any]:
+        """
+        Retrieves details of a specific device attachment by its attachment resource ID.
+        """
+        try:
+            attachment = self.client.slice.get_attachment(resource_id)
+            return {
+                "status": "SUCCESS",
+                "attachment": attachment
+            }
+        except Exception as e:
+            return {
+                "status": "FAILED",
+                "resource_id": resource_id,
+                "error": str(e)
+            }
+
+    def get_all_attachments(self) -> Dict[str, Any]:
+        """
+        Retrieves all slice attachments registered in the system.
+        """
+        try:
+            attachments = self.client.slice.get_device_attachments()
+            return {
+                "status": "SUCCESS",
+                "attachments": attachments
+            }
+        except Exception as e:
+            return {
+                "status": "FAILED",
+                "error": str(e)
+            }
+
     def delete_slice_direct(self, slice_id: str) -> None:
         """Immediately calls delete on a slice without state polling."""
         self.client.slice.delete_slice(slice_id)
 
     def delete_network_slice(self, slice_id: str, max_poll_seconds: int = 180) -> Dict[str, Any]:
-        """Safely deactivates and deletes a 5G network slice with polling."""
+        """Deactivates and deletes a 5G network slice with polling."""
         try:
-            try:
-                my_slice = self.client.slice.get_slice(slice_id)
-                current_state = my_slice.get("state", "UNKNOWN") if isinstance(my_slice, dict) else getattr(my_slice, "state", "UNKNOWN")
-            except Exception as e:
-                return {
-                    "status": "FAILED",
-                    "slice_id": slice_id,
-                    "error": f"Slice '{slice_id}' not found or inaccessible: {str(e)}"
-                }
+            current_state = self.get_slice_state(slice_id)
 
             if current_state == "OPERATING":
                 try:
@@ -181,8 +255,7 @@ class CamaraService:
                 while current_state != "AVAILABLE" and (time.time() - start_time) < max_poll_seconds:
                     time.sleep(5)
                     try:
-                        my_slice = self.client.slice.get_slice(slice_id)
-                        current_state = my_slice.get("state", "UNKNOWN") if isinstance(my_slice, dict) else getattr(my_slice, "state", "UNKNOWN")
+                        current_state = self.get_slice_state(slice_id)
                     except Exception:
                         pass
 

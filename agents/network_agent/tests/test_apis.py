@@ -7,7 +7,7 @@ load_dotenv()
 print("TEST BEFORE CLIENT")
 client = NetworkAsCodeApi(
     rapidapi_host=os.getenv("RAPIDAPI_HOST"),
-    api_key=os.getenv("NOKIA_API_KEY"),
+    api_key=os.getenv("RAPIDAPI_KEY"),
 )
 print(os.getenv("RAPIDAPI_HOST"))
 

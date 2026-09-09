@@ -7,13 +7,13 @@ load_dotenv()
 
 nac_client = NetworkAsCodeApi(
     rapidapi_host=os.getenv("RAPIDAPI_HOST"),
-    api_key=os.getenv("NOKIA_API_KEY")
+    api_key=os.getenv("RAPIDAPI_KEY")
 )
 
 slice = nac_client.slice.list_slices()
 
 print(slice)
-
+print("\n[INFO] Waiting for 5 seconds before checking device attachments...")
 all_attachments = nac_client.slice.get_device_attachments()
 if all_attachments:
     print(all_attachments)
