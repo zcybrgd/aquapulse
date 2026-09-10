@@ -1,6 +1,13 @@
 import type { AgentAuditEventDetail, AgentAuditRunDetail, JsonObject, JsonValue } from "../types/agentAudit";
 import type { AgentFindingRecord, AgentRecommendationRecord, AgentRunDetail } from "../types/integrations";
-import { agentCodeLabel, auditTimelineHeading, omitHiddenReasoning } from "./agentAudit";
+import {
+  agentCodeLabel,
+  auditTimelineHeading,
+  eventTypeLabel,
+  isActiveAgentRunStatus,
+  omitHiddenReasoning,
+  stageLabel,
+} from "./agentAudit";
 import { formatDateTime, formatNumber, formatPercent } from "./format";
 
 const UNAVAILABLE = "Unavailable";
@@ -372,6 +379,37 @@ export function readEstimatedVolumeLoss(physical: Record<string, JsonValue>): nu
   return null;
 }
 
+export function formatEstimatedVolumeLoss(physical: Record<string, JsonValue>): string | null {
+  if (Object.prototype.hasOwnProperty.call(physical, "estimated_volume_loss_lpm")) {
+    const litersPerMinute = asNumber(physical.estimated_volume_loss_lpm);
+    return litersPerMinute === null ? null : `${formatNumber(litersPerMinute, 1)} L/min`;
+  }
+  const cubicMetres = readEstimatedVolumeLoss(physical);
+  return cubicMetres === null ? null : `${formatNumber(cubicMetres, 1)} m³`;
+}
+
+export function investigationFindingView(finding: AgentFindingRecord): InvestigationFindingView {
+  return {
+    key: finding.id || finding.external_anomaly_id,
+    anomalyId: finding.external_anomaly_id,
+    classification: finding.classification,
+    severityTier: finding.severity_tier,
+    confidence: finding.confidence_score,
+    clusterId: finding.external_cluster_id,
+    segmentId: finding.external_segment_id,
+    valveId: finding.external_valve_id,
+    mappingStatus: finding.mapping_status,
+    mappedDetectionId: finding.mapped_detection_id,
+    mappedSegmentId: finding.mapped_segment_id,
+    mappedValveId: finding.mapped_valve_id,
+    mappedSensorId: finding.mapped_sensor_id,
+    justification: finding.operator_justification,
+    physical: asJsonObject(finding.physical_deviations),
+    criticality: asJsonObject(finding.criticality_metrics),
+    network: asJsonObject(finding.network_status),
+  };
+}
+
 export function networkField(network: Record<string, JsonValue>, ...keys: string[]): JsonValue | undefined {
   for (const key of keys) {
     if (Object.prototype.hasOwnProperty.call(network, key)) {
@@ -495,7 +533,7 @@ export function mappingRows(
         externalId: finding.segmentId,
         mappedId: finding.mappedSegmentId,
         mapped: Boolean(finding.mappedSegmentId),
-        href: finding.mappedSegmentId ? `/assets/${encodeURIComponent(finding.mappedSegmentId)}` : null,
+        href: null,
       });
     }
     if (finding.valveId) {
@@ -599,6 +637,152 @@ export function validationLabel(run: AgentAuditRunDetail, integration: AgentRunD
 export function rawPayload(integration: AgentRunDetail | null): JsonValue {
   if (!integration?.response_payload) return null;
   return sanitizeDisplayValue(omitHiddenReasoning(integration.response_payload as JsonValue));
+}
+
+export interface RunTimelineExtras {
+  analysisTimestamp?: string | null;
+  completedAt?: string | null;
+  findingCount?: number;
+  recommendationCount?: number;
+}
+
+export interface RunTimelineItem {
+  key: string;
+  stage: string;
+  eventType: string;
+  title: string;
+  status: string;
+  agentLabel: string;
+  occurredAt: string;
+  summary: string;
+  warning: string | null;
+  errorCode: string | null;
+  derived: boolean;
+}
+
+function offsetIso(timestamp: string, durationMs: number | null): string | null {
+  if (durationMs == null) return null;
+  const ms = Date.parse(timestamp);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms + durationMs).toISOString();
+}
+
+function sortTimelineItems(items: RunTimelineItem[]): RunTimelineItem[] {
+  return [...items].sort((left, right) => {
+    const byTime = Date.parse(left.occurredAt) - Date.parse(right.occurredAt);
+    if (Number.isFinite(byTime) && byTime !== 0) return byTime;
+    return left.key.localeCompare(right.key);
+  });
+}
+
+export function derivedRunTimeline(
+  run: AgentAuditRunDetail,
+  extras: RunTimelineExtras = {},
+): RunTimelineItem[] {
+  const agentLabel = agentCodeLabel(run.agent_code);
+  const findingCount = extras.findingCount ?? run.findings.length;
+  const recommendationCount = extras.recommendationCount ?? run.recommendation_decisions.length;
+  const completedAt =
+    extras.completedAt ?? offsetIso(run.started_at, run.duration_ms);
+  const items: RunTimelineItem[] = [];
+
+  if (extras.analysisTimestamp) {
+    items.push({
+      key: "analysis",
+      stage: stageLabel(run.agent_type === "response_agent" ? "response" : "anomaly_investigation"),
+      eventType: "analysis",
+      title: "Agent analysis",
+      status: "succeeded",
+      agentLabel,
+      occurredAt: extras.analysisTimestamp,
+      summary: "Timestamp reported by the agent in the stored result payload.",
+      warning: null,
+      errorCode: null,
+      derived: true,
+    });
+  }
+
+  if (run.started_at) {
+    items.push({
+      key: "received",
+      stage: stageLabel("audit"),
+      eventType: "result_received",
+      title: "Result received",
+      status: isActiveAgentRunStatus(run.status) ? run.status : "succeeded",
+      agentLabel,
+      occurredAt: run.started_at,
+      summary: `${agentLabel} result was stored by AquaPulse. Advisory only.`,
+      warning: null,
+      errorCode: null,
+      derived: true,
+    });
+  }
+
+  if (completedAt) {
+    const stored: string[] = [];
+    if (findingCount > 0) {
+      stored.push(`${findingCount} investigation finding${findingCount === 1 ? "" : "s"} stored`);
+    }
+    if (recommendationCount > 0) {
+      stored.push(
+        `${recommendationCount} response recommendation${recommendationCount === 1 ? "" : "s"} stored`,
+      );
+    }
+    const duration =
+      run.duration_ms != null ? `Ingest finished in ${run.duration_ms} ms.` : `Run ${statusLabel(run.status).toLowerCase()}.`;
+    const storedNote = stored.length > 0 ? `${stored.join(". ")}.` : null;
+    items.push({
+      key: "completed",
+      stage: stageLabel("audit"),
+      eventType: "run_completed",
+      title: run.status === "failed" || run.status === "rejected" ? "Run ended" : "Run completed",
+      status: run.status,
+      agentLabel,
+      occurredAt: completedAt,
+      summary: [duration, storedNote, "Advisory only."].filter(Boolean).join(" "),
+      warning: null,
+      errorCode: null,
+      derived: true,
+    });
+  } else if (isActiveAgentRunStatus(run.status) && run.started_at) {
+    items.push({
+      key: "in-progress",
+      stage: stageLabel("audit"),
+      eventType: "run_in_progress",
+      title: "Run in progress",
+      status: run.status,
+      agentLabel,
+      occurredAt: run.started_at,
+      summary: "This stored run has not recorded a completion time.",
+      warning: null,
+      errorCode: null,
+      derived: true,
+    });
+  }
+
+  return sortTimelineItems(items);
+}
+
+export function runTimelineItems(
+  run: AgentAuditRunDetail,
+  extras: RunTimelineExtras = {},
+): RunTimelineItem[] {
+  if (run.events.length > 0) {
+    return run.events.map((event) => ({
+      key: event.id,
+      stage: stageLabel(event.pipeline_stage),
+      eventType: event.event_type,
+      title: eventTypeLabel(event),
+      status: event.status,
+      agentLabel: agentCodeLabel(event.agent_code),
+      occurredAt: event.occurred_at,
+      summary: event.summary,
+      warning: eventWarning(event),
+      errorCode: event.error_code,
+      derived: false,
+    }));
+  }
+  return derivedRunTimeline(run, extras);
 }
 
 export function eventWarning(event: AgentAuditEventDetail): string | null {

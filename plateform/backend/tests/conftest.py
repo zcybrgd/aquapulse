@@ -19,6 +19,9 @@ DEFAULT_TEST_URL = (
 )
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_URL)
 os.environ["APP_ENV"] = "test"
+# Pytest never calls live Nokia/CAMARA, even if a RapidAPI key is present locally.
+os.environ["NOKIA_NETWORK_API_ENABLED"] = "false"
+os.environ["NOKIA_NETWORK_API_MODE"] = "mock"
 
 
 def _ensure_test_database(url: str) -> None:

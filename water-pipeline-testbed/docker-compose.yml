@@ -2,7 +2,8 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # 6380 on the host so Windows/WSL Redis on 6379 cannot steal AIA subscriptions
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

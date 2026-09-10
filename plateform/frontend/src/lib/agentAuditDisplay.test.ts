@@ -5,11 +5,14 @@ import {
   auditTimelineHeading,
   mappingRows,
   mappingWarningMessages,
+  formatEstimatedVolumeLoss,
+  derivedRunTimeline,
   mergeInvestigationFindings,
   mergeResponseResult,
   readEstimatedVolumeLoss,
   readInvestigationBatch,
   readReasoningSteps,
+  runTimelineItems,
   sanitizeDisplayValue,
 } from "./agentAuditDisplay";
 
@@ -44,6 +47,41 @@ describe("agent audit display parsers", () => {
     expect(finding.physical.pressure_drop_pct).toBeNull();
     expect(readEstimatedVolumeLoss(finding.physical)).toBeNull();
     expect(finding.criticality.population_served).toBeNull();
+  });
+
+  it("formats estimated volume loss in L/min when that field is present", () => {
+    expect(
+      formatEstimatedVolumeLoss({
+        estimated_volume_loss_lpm: 485.415541546982535,
+      }),
+    ).toBe("485.4 L/min");
+    expect(formatEstimatedVolumeLoss({ estimated_volume_loss_m3: 12.5 })).toBe("12.5 m³");
+  });
+
+  it("derives a run timeline from stored timestamps when no audit events exist", () => {
+    const items = derivedRunTimeline(auditRun(), {
+      analysisTimestamp: "2026-08-31T02:00:00Z",
+      completedAt: "2026-09-09T22:49:12.984984Z",
+      findingCount: 1,
+    });
+    expect(items.map((item) => item.title)).toEqual([
+      "Agent analysis",
+      "Result received",
+      "Run completed",
+    ]);
+    expect(items[2]?.summary).toContain("1 investigation finding stored");
+    expect(items.every((item) => item.derived)).toBe(true);
+  });
+
+  it("prefers stored audit events over a derived run timeline", () => {
+    const items = runTimelineItems(
+      auditRun({
+        events: [auditEvent({ summary: "Finding accepted" })],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.title).toBe("cluster-review");
+    expect(items[0]?.derived).toBe(false);
   });
 
   it("does not invent a mapped AquaPulse entity for an unmapped external ID", () => {
@@ -85,6 +123,9 @@ describe("agent audit display parsers", () => {
   });
 
   it("sorts timeline titles from real event presence and run status", () => {
+    expect(auditTimelineHeading({ status: "succeeded", events: [], started_at: "2026-09-09T22:49:12.919984Z" })).toBe(
+      "Run timeline",
+    );
     expect(auditTimelineHeading({ status: "succeeded", events: [] })).toBe("No audit events recorded");
     expect(auditTimelineHeading({ status: "running", events: [auditEvent()] })).toBe("Partial audit timeline");
     expect(auditTimelineHeading({ status: "succeeded", events: [auditEvent()] })).toBe("Chronological stage timeline");

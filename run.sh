@@ -23,8 +23,10 @@ TESTBED_DIR="$ROOT_DIR/water-pipeline-testbed"
 AGENT_DIR="$ROOT_DIR/agents/investigation_agent"
 
 NETWORK_AGENT_DIR="$ROOT_DIR/agents/network_agent"
+RESPONSE_AGENT_DIR="$ROOT_DIR/agents/response_agent"
 NETWORK_AGENT_PORT=9001
 NETWORK_RELEASE_PORT=8004
+RESPONSE_AGENT_PORT=9002
 
 PLATFORM_COMPOSE="$PLATFORM_DIR/docker-compose.yml"
 TESTBED_COMPOSE="$TESTBED_DIR/docker-compose.yml"
@@ -139,7 +141,8 @@ Services:
     Testbed Dashboard   http://localhost:${TESTBED_DASHBOARD_PORT}
     AIA Agent API       http://localhost:${AGENT_PORT}
     Network Agent       http://localhost:${NETWORK_AGENT_PORT}
-    Response Agent      http://localhost:${NETWORK_RELEASE_PORT}
+    Network Release     http://localhost:${NETWORK_RELEASE_PORT}
+    Response Agent      http://localhost:${RESPONSE_AGENT_PORT}
     Platform Frontend   http://localhost:${FRONTEND_PORT}
 
 Docker:
@@ -272,6 +275,34 @@ fi
 log "Python: $(python --version)"
 log "Environment: $VIRTUAL_ENV"
 
+# Nokia Network as Code for Network Health (reachability / location only).
+# This is not CAMARA_ENABLED — actuation and valve commands stay off.
+configure_nokia_network_health() {
+    local root_env="$ROOT_DIR/.env"
+    if [[ ! -f "$root_env" ]]; then
+        log "Nokia/CAMARA Network Health: mock (no root .env)"
+        return 0
+    fi
+    if ROOT_ENV_FILE="$root_env" python - <<'PY'
+import os
+from dotenv import dotenv_values
+
+values = dotenv_values(os.environ["ROOT_ENV_FILE"])
+key = (values.get("RAPIDAPI_KEY") or values.get("NOKIA_NETWORK_API_KEY") or "").strip().strip('"').strip("'")
+raise SystemExit(0 if key else 1)
+PY
+    then
+        export NOKIA_NETWORK_API_ENABLED="${NOKIA_NETWORK_API_ENABLED:-true}"
+        export NOKIA_NETWORK_API_MODE="${NOKIA_NETWORK_API_MODE:-live}"
+        export NOKIA_NETWORK_API_HOST="${NOKIA_NETWORK_API_HOST:-network-as-code.nokia.rapidapi.com}"
+        export NOKIA_NETWORK_API_BASE_URL="${NOKIA_NETWORK_API_BASE_URL:-https://network-as-code.p-eu.rapidapi.com}"
+        log "Nokia/CAMARA Network Health: live (RapidAPI key present; actuation flags unchanged)"
+    else
+        log "Nokia/CAMARA Network Health: mock (no RapidAPI key)"
+    fi
+}
+configure_nokia_network_health
+
 # ----------------------------------------------------------------------------
 # 4. Python Dependencies
 # ----------------------------------------------------------------------------
@@ -309,19 +340,31 @@ section "5. Starting Docker infrastructure"
 
 log "Starting AquaPulse platform stack..."
 
-docker compose \
-    -f "$PLATFORM_COMPOSE" \
-    up -d --build
+if docker inspect aquapulse-db >/dev/null 2>&1; then
+    if [[ "$(docker inspect -f '{{.State.Running}}' aquapulse-db)" == "true" ]]; then
+        log "Reusing existing aquapulse-db container."
+    else
+        log "Starting existing aquapulse-db container..."
+        docker start aquapulse-db >/dev/null
+    fi
+else
+    docker compose \
+        --env-file "$BACKEND_DIR/.env" \
+        -f "$PLATFORM_COMPOSE" \
+        up -d
+fi
 
-success "Platform Docker stack started."
+success "Platform Docker stack ready."
 
 echo
 
 log "Starting water pipeline testbed..."
 
+# AquaPulse DB already binds host 5433. Skip testbed TimescaleDB to avoid that clash.
+# Agents in this launcher use Redis + the simulator, not the AIA Timescale instance.
 docker compose \
     -f "$TESTBED_COMPOSE" \
-    up -d --build
+    up -d redis simulator dashboard
 
 success "Water pipeline testbed started."
 
@@ -405,21 +448,18 @@ start_service \
     --port "$NETWORK_RELEASE_PORT" \
     --reload
 
-# Network Management Agent Listener (Redis Bridge)
+# Network Management Agent Listener (Redis Bridge + /health on NETWORK_AGENT_PORT)
 start_service \
     "Network Agent Listener" \
     "$ROOT_DIR" \
-    env PYTHONPATH="$ROOT_DIR" python "$NETWORK_AGENT_DIR/runner.py"
+    env PYTHONPATH="$ROOT_DIR" NETWORK_AGENT_PORT="$NETWORK_AGENT_PORT" python "$NETWORK_AGENT_DIR/runner.py"
 
 
 # Platform frontend
 start_service \
     "Platform Frontend" \
     "$FRONTEND_DIR" \
-    npm run dev \
-    -- \
-    --host 0.0.0.0 \
-    --port "$FRONTEND_PORT"
+    npx vite --host 0.0.0.0 --port "$FRONTEND_PORT"
 
 # ----------------------------------------------------------------------------
 # 8. Startup Summary
@@ -441,7 +481,10 @@ ${GREEN}AIA Investigation Agent:${RESET}
 ${GREEN}Network Agent:${RESET}
     ${NETWORK_AGENT_URL}
 
-${GREEN}Response Agent / Network Release Server:${RESET}
+${GREEN}Network Release Server:${RESET}
+    http://localhost:${NETWORK_RELEASE_PORT}
+
+${GREEN}Response Agent:${RESET}
     ${RESPONSE_AGENT_URL}
 
 ${GREEN}Platform Frontend:${RESET}

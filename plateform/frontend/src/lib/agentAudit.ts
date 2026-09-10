@@ -141,14 +141,19 @@ export function sortAuditEventsChronologically(events: AgentAuditEventDetail[]):
   });
 }
 
-export function auditTimelineHeading(run: Pick<AgentAuditRunDetail, "status" | "events">): string {
-  if (run.events.length === 0) {
-    return "No audit events recorded";
+export function auditTimelineHeading(
+  run: Pick<AgentAuditRunDetail, "status" | "events"> & { started_at?: string | null },
+): string {
+  if (run.events.length > 0) {
+    if (isActiveAgentRunStatus(run.status)) {
+      return "Partial audit timeline";
+    }
+    return "Chronological stage timeline";
   }
-  if (isActiveAgentRunStatus(run.status)) {
-    return "Partial audit timeline";
+  if (run.started_at) {
+    return "Run timeline";
   }
-  return "Chronological stage timeline";
+  return "No audit events recorded";
 }
 
 function mapAuditEvent(value: unknown): AgentAuditEventDetail | null {

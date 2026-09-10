@@ -9,10 +9,11 @@ from pathlib import Path
 from app.db.models.integration import IntegrationIdentityMapping
 from app.db.session import get_session_factory
 from app.integrations.constants import ENTITY_TYPES
+from app.integrations.identity import apply_stored_mappings
 from app.repositories.integrations import IdentityMappingRepository
 
 
-def import_mappings(path: Path) -> int:
+def import_mappings(path: Path, *, apply_existing: bool = True) -> tuple[int, dict[str, int]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         raise SystemExit("Mapping file must be a JSON array.")
@@ -37,24 +38,31 @@ def import_mappings(path: Path) -> int:
                 )
             )
             count += 1
+        applied = apply_stored_mappings(session) if apply_existing else {"findings": 0, "recommendations": 0}
         session.commit()
     except Exception:
         session.rollback()
         raise
     finally:
         session.close()
-    return count
+    return count, applied
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import AquaPulse agent identity mappings.")
     parser.add_argument("--file", required=True, help="JSON array of mapping objects")
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Do not re-apply mappings onto already ingested findings.",
+    )
     args = parser.parse_args()
     path = Path(args.file)
     if not path.is_file():
         raise SystemExit(f"File not found: {path}")
-    count = import_mappings(path)
+    count, applied = import_mappings(path, apply_existing=not args.skip_existing)
     print(f"Imported {count} identity mapping(s). Unknown IDs are never guessed.")
+    print(f"Updated {applied['findings']} finding(s) and {applied['recommendations']} recommendation(s).")
 
 
 if __name__ == "__main__":

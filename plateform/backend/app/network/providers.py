@@ -28,6 +28,36 @@ from app.network.device_network import (
 
 logger = logging.getLogger(__name__)
 
+# Nokia RapidAPI sandbox numbers. AquaPulse seed SIMs are operator-style E.164
+# values; the live adapter maps them here and never sends +971 / +974 / etc.
+NOKIA_SANDBOX_DEFAULT_MSISDN = "+99999991001"
+NOKIA_SANDBOX_MSISDN_BY_ASSET = {
+    "+971500007007": "+99999991003",
+    "+971500004821": "+99999991001",
+    "+971500000221": "+99999991001",
+    "+971500000201": "+99999991001",
+    "+971500000301": "+99999991001",
+    "+966500000401": "+99999991003",
+    "+974300000044": "+99999991001",
+    "+974300000502": "+99999991001",
+    "+968900000010": "+99999991001",
+    "+968900000601": "+99999991003",
+    "+212600000031": "+99999991001",
+    "+212600000704": "+99999991001",
+    "+966500000801": "+99999991001",
+    "+962700000903": "+99999991001",
+}
+
+
+def nokia_sandbox_phone_number(device_msisdn: str) -> str:
+    compact = "".join(ch for ch in device_msisdn.strip() if ch.isdigit())
+    if not compact:
+        return NOKIA_SANDBOX_DEFAULT_MSISDN
+    normalized = f"+{compact}"
+    if normalized.startswith("+9999999"):
+        return normalized
+    return NOKIA_SANDBOX_MSISDN_BY_ASSET.get(normalized, NOKIA_SANDBOX_DEFAULT_MSISDN)
+
 
 class DisabledDeviceNetworkProvider:
     provider_name = "disabled"
@@ -173,6 +203,7 @@ class HttpNokiaDeviceNetworkProvider:
                 await asyncio.sleep(0.05 * (attempt + 1))
             except httpx.RequestError as exc:
                 last_error = exc
+                logger.warning("Nokia Network as Code request failed: %s", type(exc).__name__)
                 if attempt >= attempts - 1:
                     raise DeviceNetworkProviderError(
                         "Nokia Network as Code could not be reached.",
@@ -187,14 +218,14 @@ class HttpNokiaDeviceNetworkProvider:
     async def get_reachability(self, device_msisdn: str) -> ReachabilityResult:
         payload = await self._post(
             self._settings.nokia_reachability_path,
-            {"device": {"phoneNumber": device_msisdn}},
+            {"device": {"phoneNumber": nokia_sandbox_phone_number(device_msisdn)}},
         )
         return normalize_reachability_payload(payload)
 
     async def retrieve_location(self, device_msisdn: str) -> LocationResult:
         payload = await self._post(
             self._settings.nokia_location_path,
-            {"device": {"phoneNumber": device_msisdn}, "maxAge": 120},
+            {"device": {"phoneNumber": nokia_sandbox_phone_number(device_msisdn)}, "maxAge": 120},
         )
         return normalize_location_payload(payload)
 

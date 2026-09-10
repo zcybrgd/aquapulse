@@ -612,6 +612,7 @@ class IntegrationService:
                         external_valve_id=threat.criticality_metrics.associated_valve_id,
                         anomaly_detection_id=detection_row.id if detection_row is not None else None,
                         mapped_detection_id=detection.internal_public_id,
+                        mapped_sensor_id=cluster.internal_public_id,
                         mapped_segment_id=segment.internal_public_id,
                         mapped_valve_id=valve.internal_public_id,
                         network_status=threat.network_status.model_dump(mode="json"),

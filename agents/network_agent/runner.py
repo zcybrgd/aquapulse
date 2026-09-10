@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import threading
 import uuid
 import redis
 from typing import Optional
@@ -116,6 +117,24 @@ def process_threats(threats: list[dict]):
         logger.info("NMA Workflow Completed successfully for %d request(s).", len(actionable_requests))
     except Exception as e:
         logger.error(f"Error during NMA execution: {e}", exc_info=True)
+
+
+def start_readiness_server(port: int | None = None) -> None:
+    """Serve GET /health for AquaPulse readiness probes. No /v1/contract."""
+    from fastapi import FastAPI
+    import uvicorn
+
+    listen_port = int(port or os.getenv("NETWORK_AGENT_PORT", "9001"))
+    health_app = FastAPI(title="AquaPulse Network Agent Readiness")
+
+    @health_app.get("/health")
+    def health() -> dict:
+        return {"status": "ok", "service": "network_management_agent"}
+
+    config = uvicorn.Config(health_app, host="0.0.0.0", port=listen_port, log_level="warning")
+    server = uvicorn.Server(config)
+    threading.Thread(target=server.run, name="nma-health", daemon=True).start()
+    logger.info("NMA readiness server listening on http://127.0.0.1:%s/health", listen_port)
 
 
 def start_listener():

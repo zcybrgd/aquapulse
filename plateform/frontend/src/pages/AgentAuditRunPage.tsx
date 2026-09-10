@@ -122,7 +122,15 @@ function AgentAuditRunDetails({
       ) : null}
 
       <IdentityMappingSection rows={identities} warnings={warnings} />
-      <AuditRunTimeline run={run} />
+      <AuditRunTimeline
+        run={run}
+        extras={{
+          analysisTimestamp: batch.analysisTimestamp,
+          completedAt: integration?.completed_at,
+          findingCount: investigationFindings.length,
+          recommendationCount: recommendations.length,
+        }}
+      />
       <RawPayloadSection payload={rawPayload(integration)} />
     </>
   );

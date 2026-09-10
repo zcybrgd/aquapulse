@@ -192,6 +192,7 @@ def test_mapping_success_without_guessing(test_database) -> None:
         if item.external_anomaly_id == payload["investigated_threats"][0]["anomaly_id"]
     )
     assert finding.mapping_status in {"partial", "mapped"}
+    assert finding.mapped_sensor_id == "DET-000001"
     assert any(item.get("code") == "agent_identity_unmapped" for item in run.mapping_warnings)
     service.session.close()
 

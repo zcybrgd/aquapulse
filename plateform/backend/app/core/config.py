@@ -1,7 +1,19 @@
 from functools import lru_cache
+from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_PROJECT_ROOT = _BACKEND_DIR.parent.parent
+_DEFAULT_NOKIA_HOST = "network-as-code.p-eu.rapidapi.com"
+_LEGACY_NOKIA_HOSTS = {"network-as-code.nokia.rapidapi.com"}
+
+
+def _strip_env_quotes(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    return value.strip().strip('"').strip("'")
 
 
 class Settings(BaseSettings):
@@ -52,10 +64,16 @@ class Settings(BaseSettings):
     nokia_network_api_enabled: bool = False
     nokia_network_api_mode: str = "mock"
     nokia_network_api_base_url: str = ""
-    nokia_network_api_key: str = ""
-    nokia_network_api_host: str = ""
-    nokia_location_path: str = "/location-retrieval/v0.3/retrieve"
-    nokia_reachability_path: str = "/device-reachability-status/v0.7/retrieve"
+    nokia_network_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("NOKIA_NETWORK_API_KEY", "RAPIDAPI_KEY"),
+    )
+    nokia_network_api_host: str = Field(
+        default="",
+        validation_alias=AliasChoices("NOKIA_NETWORK_API_HOST", "RAPIDAPI_HOST"),
+    )
+    nokia_location_path: str = "/location-retrieval/v0/retrieve"
+    nokia_reachability_path: str = "/device-status/device-reachability-status/v1/retrieve"
     nokia_network_timeout_seconds: float = 10
     nokia_network_cache_seconds: int = 300
     nokia_network_max_retries: int = 1
@@ -63,9 +81,11 @@ class Settings(BaseSettings):
     nokia_network_concurrency: int = 4
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_PROJECT_ROOT / ".env"), str(_BACKEND_DIR / ".env")),
         env_file_encoding="utf-8",
         extra="ignore",
+        env_ignore_empty=True,
+        populate_by_name=True,
     )
 
     @field_validator("database_url")
@@ -77,6 +97,25 @@ class Settings(BaseSettings):
                 "and start PostgreSQL with docker compose up -d."
             )
         return value
+
+    @field_validator("nokia_network_api_key", "nokia_network_api_host", "nokia_network_api_base_url", mode="before")
+    @classmethod
+    def strip_nokia_env(cls, value: object) -> object:
+        return _strip_env_quotes(value)
+
+    @model_validator(mode="after")
+    def default_nokia_base_url(self) -> "Settings":
+        host = self.nokia_network_api_host.strip()
+        key = self.nokia_network_api_key.strip()
+        base = self.nokia_network_api_base_url.strip()
+        if key and not host:
+            self.nokia_network_api_host = "network-as-code.nokia.rapidapi.com"
+            host = self.nokia_network_api_host
+        # RapidAPI API ids such as network-as-code.nokia.rapidapi.com are headers, not DNS names.
+        if key and (not base or any(legacy in base for legacy in _LEGACY_NOKIA_HOSTS)):
+            connect_host = _DEFAULT_NOKIA_HOST if host in _LEGACY_NOKIA_HOSTS or not host else host
+            self.nokia_network_api_base_url = f"https://{connect_host}"
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

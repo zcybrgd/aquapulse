@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { fetchAgentFinding, fetchAgentRecommendation, fetchAgentRun } from "../api/integrations";
+import { FindingEvidenceSections } from "../components/agent-audit/InvestigationFindingCard";
 import { Card } from "../components/ui/Card";
 import { ErrorState } from "../components/ui/ErrorState";
 import { Skeleton } from "../components/ui/Skeleton";
+import { investigationFindingView } from "../lib/agentAuditDisplay";
 import { formatDateTime } from "../lib/format";
 import type { AgentFindingRecord, AgentRecommendationRecord, AgentRunDetail } from "../types/integrations";
 
@@ -18,17 +20,6 @@ function BackToQueue() {
     <Link to="/detections" className="text-sm font-medium text-teal">
       Back to Investigation Queue
     </Link>
-  );
-}
-
-function JsonBlock({ value }: { value: unknown }) {
-  if (value == null || (typeof value === "object" && value !== null && Object.keys(value as object).length === 0)) {
-    return <p className="text-sm text-ink-muted">Not supplied.</p>;
-  }
-  return (
-    <pre className="mt-2 max-h-64 overflow-auto rounded-xl bg-page p-3 text-xs text-ink">
-      {JSON.stringify(value, null, 2)}
-    </pre>
   );
 }
 
@@ -136,10 +127,6 @@ export function IntegrationFindingPage() {
             <dd className="mt-0.5 font-medium text-ink">{finding.severity_tier}</dd>
           </div>
           <div>
-            <dt className="text-ink-muted">Confidence</dt>
-            <dd className="mt-0.5 font-medium text-ink">{finding.confidence_score}</dd>
-          </div>
-          <div>
             <dt className="text-ink-muted">Mapping</dt>
             <dd className="mt-0.5 font-medium text-ink">
               {finding.mapping_status}
@@ -150,12 +137,7 @@ export function IntegrationFindingPage() {
         <p className="mt-4 text-sm font-medium text-ink">Agent result is advisory</p>
         <p className="mt-2 text-sm text-ink-muted">{finding.operator_justification ?? "No justification supplied."}</p>
         <div className="mt-4">
-          <p className="text-sm font-medium text-ink">Physical deviations</p>
-          <JsonBlock value={finding.physical_deviations} />
-        </div>
-        <div className="mt-4">
-          <p className="text-sm font-medium text-ink">Criticality</p>
-          <JsonBlock value={finding.criticality_metrics} />
+          <FindingEvidenceSections finding={investigationFindingView(finding)} />
         </div>
         {finding.run_id ? (
           <Link
