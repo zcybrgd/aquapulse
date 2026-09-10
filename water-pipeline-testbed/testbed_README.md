@@ -5,16 +5,16 @@ wired directly to the already-built **Anomaly Investigation Agent (AIA)**,
 with a live web dashboard and an automated scenario-evaluation framework.
 
 ```
-┌─────────────┐  telemetry batches   ┌──────────────┐   results    ┌───────────┐
-│  simulator   │ ───────────────────▶│  aia-service │──────────────▶│dashboard  │
-│ (physics +   │◀───────────────────│ (wraps the   │   (Redis      │(3D twin + │
-│  faults +    │  network_status     │  aia package │    pub/sub)   │ control   │
-│  network     │  (CAMARA stand-in)  │  unmodified) │               │ panel +   │
-│  sim)        │                     └──────┬───────┘               │ AIA feed) │
-└──────┬───────┘                            │                       └───────────┘
-       │ sim:state, sim:raw_logs (Redis)    │ writes results               ▲
+┌─────────────┐  telemetry batches   ┌──────────────┐   results     ┌───────────┐
+│  simulator  │ ───────────────────▶ │  aia-service │──────────────▶│dashboard  │
+│ (physics +  │◀───────────────────  │ (wraps the   │   (Redis      │(3D twin + │
+│  faults +   │  network_status      │  aia package │    pub/sub)   │ control   │
+│  network    │  (CAMARA stand-in)   │  unmodified) │               │ panel +   │
+│  sim)       │                      └──────┬───────┘               │ AIA feed) │
+└──────┬──────┘                             │                       └───────────┘
+       │ sim:state, sim:raw_logs (Redis)    │ writes results                ▲
        └────────────────────────────────────┼───────────────────────────────┘
-                                             ▼
+                                            ▼
                                        TimescaleDB (eval framework reads from here)
 ```
 
