@@ -10,15 +10,11 @@ logger = logging.getLogger("actuation_agent.tools.reachability")
 
 # Known cluster/device ID to CAMARA MSISDN mappings
 DEFAULT_DEVICE_MSISDN_MAP: dict[str, str] = {
-    "cluster-desert-042": "+99999991001",
+    "cluster-desert-042": "+99999991000",
     "cluster-desert-043": "+99999991001",
-    "cluster-desert-044": "+99999991003",
-    "cluster-desert-045": "+99999991001",
-    "cluster-desert-046": "+99999991001",
-    "device-14-valve-A": "+99999991001",
-    "device-offline-demo": "+99999991003",
-    "device-14-valve-A-fail": "+99999991001",
-    "cluster-urban-012": "+99999991003",
+    "cluster-desert-044": "+99999991000",
+    "cluster-desert-045": "+99999990404",
+    "cluster-desert-046": "+99999991000",
 }
 
 class DeviceReachabilityClient:

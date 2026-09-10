@@ -177,6 +177,14 @@ def interface_error_handler(_request: Request, _exc: InterfaceError) -> JSONResp
     return JSONResponse(status_code=503, content={"detail": DatabaseUnavailableError.http_detail})
 
 
+# ADDED FOR THE NOTIFICATION SERVICE
+@app.post("/api/v1/notify")
+@app.post("/v1/notify")
+@app.post("/notify")
+async def mock_notification(payload: dict):
+    return {"status": "success", "message": "Notification dispatched", "payload": payload}
+
+
 @app.get("/", include_in_schema=False)
 def root() -> dict[str, str]:
     return {"service": settings.app_name, "docs": "/docs"}

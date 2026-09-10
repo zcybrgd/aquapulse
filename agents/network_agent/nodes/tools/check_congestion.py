@@ -17,8 +17,12 @@ notification_auth_token = os.getenv("CONGESTION_NOTIFICATION_AUTH_TOKEN", "Beare
 CLUSTER_MSISDN_MAP = {
     "cluster-desert-042": "+99999991000",
     "cluster-desert-043": "+99999991001",
+    "cluster-desert-044": "+99999991000",
+    "cluster-desert-045": "+99999990404",
+    "cluster-desert-046": "+99999991000",
 }
-DEFAULT_MSISDN = os.getenv("DEFAULT_DEVICE_MSISDN", "+99999991000")
+
+DEFAULT_MSISDN = os.getenv("DEFAULT_DEVICE_MSISDN", "+990100000000")
 
 
 def normalize_to_msisdn(device_or_cluster_id: str) -> str:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import math
+from datetime import datetime
 import numpy as np
 
 from aia.config import (
@@ -8,8 +10,6 @@ from aia.config import (
     CONFIDENCE_WEIGHT_TELEMETRY,
     CONFIDENCE_WEIGHT_TREND,
     EXPECTED_TELEMETRY_WINDOW_LEN,
-    TIER1_CRITICALITY_MAX,
-    TIER2_CRITICALITY_TRIGGER,
     TIER3_CRITICALITY_REQUIRED,
     TIER3_EMERGENCY_DELTA_P_PCT_MIN,
     get_zone_thresholds,
@@ -17,13 +17,26 @@ from aia.config import (
 from aia.models import Classification, ClusterInvestigationState
 from aia.clients.topology import TopologyCache
 
+logger = logging.getLogger("aia.nodes.risk")
+
+
+def _parse_ts_seconds(ts) -> float:
+    """Safely extract float epoch timestamp from datetime, float, int, or ISO string."""
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    if isinstance(ts, datetime):
+        return ts.timestamp()
+    if isinstance(ts, str):
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except Exception:
+            pass
+    return 0.0
+
 
 def compute_trend(readings: list[float]) -> tuple[float, float]:
-    """
-    Linear-regression slope and R^2 of a value series over its reading index.
-    Returns (slope, r_squared). Slope units are per-reading; callers convert
-    to psi/min using the sampling interval where needed.
-    """
+    """Linear-regression slope and R^2 of a value series over its reading index."""
     n = len(readings)
     if n < 2:
         return 0.0, 1.0
@@ -42,8 +55,17 @@ def _slope_per_minute(readings, values: list[float]) -> float:
     n = len(readings)
     if n < 2:
         return 0.0
-    t0 = readings[0].timestamp
-    minutes = np.array([(r.timestamp - t0).total_seconds() / 60.0 for r in readings])
+
+    t0_sec = _parse_ts_seconds(readings[0].timestamp)
+    t_end_sec = _parse_ts_seconds(readings[-1].timestamp)
+    span_sec = t_end_sec - t0_sec
+
+    if span_sec > 0.01:
+        minutes = np.array([(_parse_ts_seconds(r.timestamp) - t0_sec) / 60.0 for r in readings])
+    else:
+        sample_interval_sec = 0.4
+        minutes = np.array([i * (sample_interval_sec / 60.0) for i in range(n)])
+
     if minutes[-1] <= 0:
         return 0.0
     ys = np.array(values, dtype=float)
@@ -75,12 +97,7 @@ def compute_physical_deviations(state: ClusterInvestigationState) -> None:
 
 
 def estimate_volume_loss_lpm(state: ClusterInvestigationState) -> float:
-    """
-    Estimate the volume of water lost per minute based on pipe diameter
-    and pressure drop using Torricelli's Law:
-
-        Q_loss ≈ Cd × A_leak × sqrt(2 × g × h)
-    """
+    """Estimate volume loss rate using Torricelli's Law."""
     diameter_mm = state.pipe_diameter_mm or 200.0
     drop_pct = state.pressure_drop_pct
 
@@ -92,17 +109,17 @@ def estimate_volume_loss_lpm(state: ClusterInvestigationState) -> float:
     pipe_radius_m = (diameter_mm / 2.0) / 1000.0
     pipe_area_m2 = math.pi * pipe_radius_m ** 2
     leak_fraction = min(drop_pct / 100.0, 1.0)
-    leak_area_m2 = pipe_area_m2 * leak_fraction * 0.1  # 10% proportional leakage area
+    leak_area_m2 = pipe_area_m2 * leak_fraction * 0.1
 
     cd = 0.62
     g = 9.81
     velocity_mps = cd * math.sqrt(2 * g * max(head_m, 0.0))
     flow_m3ps = leak_area_m2 * velocity_mps
-    return flow_m3ps * 1000.0 * 60.0  # m³/s → L/min
+    return flow_m3ps * 1000.0 * 60.0
 
 
 def assign_segment_metadata(state: ClusterInvestigationState, topology: TopologyCache) -> None:
-    """Map the cluster to its physical segment via the local topology cache."""
+    """Map the cluster to its physical segment via local topology cache."""
     segment = topology.get_segment_for_cluster(state.sensor_cluster_id)
     if segment is None:
         state.segment_id = f"unknown-{state.sensor_cluster_id}"
@@ -124,75 +141,69 @@ def assign_segment_metadata(state: ClusterInvestigationState, topology: Topology
 
 def assign_severity_tier(state: ClusterInvestigationState) -> int:
     """
-    Reconciled Risk Tiering Matrix with forward trend projection.
-    Anticipates pressure decay trajectory over time to prevent premature 
-    under-assessment (e.g. Tier 2 instead of Tier 3 during dynamic leaks).
+    Assesses risk tier based on actual observed physical deviations over the observation window.
+    Requires a minimum observation window to avoid premature high-tier assignment on partial windows.
     """
     readings = state.window.readings
-    baseline_p = readings[0].pressure_psi if readings else 0.0
-    current_p = readings[-1].pressure_psi if readings else 0.0
+    window_len = len(readings)
+
+    # Require minimum window length before escalating risk
+    if window_len < 5:
+        logger.info(
+            "Observation window ongoing (%d readings) for cluster %s; holding Tier 1 until full window.",
+            window_len,
+            state.sensor_cluster_id,
+        )
+        return 1
 
     delta_p = state.pressure_drop_pct
     criticality = state.criticality_score or 1
-    slope = state.pressure_slope  # psi/min (negative during pressure drop)
+    slope = state.pressure_slope
     r2 = state.trend_r_squared
 
-    # Resolve zone-specific thresholds
     thresholds = get_zone_thresholds(state.zone_id)
     t3_delta = thresholds.get("tier3_delta_p_pct_min", 25.0)
     t3_slope = thresholds.get("tier3_pressure_slope_max", -1.0)
     t2_min = thresholds.get("tier2_delta_p_pct_min", 10.0)
 
-    # --------------------------------------------------------------------------
-    # Trend Projection: Estimate pressure drop 2.5 minutes into the future
-    # --------------------------------------------------------------------------
-    projection_window_min = 2.5
-    projected_delta_p = delta_p
-    if slope < 0.0 and baseline_p > 0.0 and r2 >= 0.50:
-        projected_p = max(0.0, current_p + (slope * projection_window_min))
-        projected_delta_p = max(delta_p, ((baseline_p - projected_p) / baseline_p) * 100.0)
-
-    # Check if this asset/zone is considered high criticality
     is_high_criticality = (
-        criticality == 1 
-        or criticality == TIER3_CRITICALITY_REQUIRED 
+        criticality == 1
+        or criticality == TIER3_CRITICALITY_REQUIRED
         or criticality >= 3
     )
 
-    # Effective pressure drop considered for severity evaluation
-    effective_drop = max(delta_p, projected_delta_p)
-
-    # 1. Tier 3 (High Risk / Immediate Intervention Required):
-    # - Instantaneous or projected drop >= emergency threshold (50%)
-    if effective_drop >= TIER3_EMERGENCY_DELTA_P_PCT_MIN:
+    # 1. Tier 3 (Critical / Immediate Action):
+    if delta_p >= TIER3_EMERGENCY_DELTA_P_PCT_MIN:
         return 3
 
-    # - High-criticality zone experiencing significant drop (>= t3_delta) or projected severe drop
-    if is_high_criticality and effective_drop >= t3_delta:
+    if delta_p >= t3_delta and (slope <= t3_slope or r2 >= 0.5):
         return 3
 
-    # - Rapid pressure drop rate (slope < t3_slope) with ongoing pressure loss (>= t2_min)
-    if slope < t3_slope and effective_drop >= t2_min:
+    if (slope <= t3_slope or slope <= -2.0) and delta_p >= 10.0 and r2 >= 0.6:
         return 3
 
-    # - Standard Tier 3: drop >= t3_delta with moderate criticality or slope trigger
-    if effective_drop >= t3_delta and (criticality >= TIER2_CRITICALITY_TRIGGER or slope < t3_slope):
+    if is_high_criticality and delta_p >= 15.0 and r2 >= 0.5:
         return 3
 
-    # 2. Tier 2 (Moderate Anomaly / Action Required):
-    # - Effective pressure drop meets moderate threshold (>= t2_min)
-    if effective_drop >= t2_min:
+    if state.flow_surge_pct >= 25.0 and delta_p >= 10.0:
+        return 3
+
+    # 2. Tier 2 (Moderate / Operator Alert):
+    if delta_p >= t2_min:
         return 2
 
-    # 3. Tier 1 (Low Risk / Minor Deviation / Log Only):
+    if slope <= -0.5 and delta_p >= 5.0:
+        return 2
+
+    if state.flow_surge_pct >= 10.0:
+        return 2
+
+    # 3. Tier 1 (Low Risk / Routine Log):
     return 1
 
 
 def compute_confidence_score(state: ClusterInvestigationState) -> float:
-    """
-    Weighted confidence score:
-        score = 0.40 * C_telemetry + 0.40 * C_CAMARA + 0.20 * C_trend
-    """
+    """Weighted confidence score across telemetry, CAMARA, and trend fit."""
     window_len = len(state.window.readings)
     c_telemetry = min(1.0, window_len / EXPECTED_TELEMETRY_WINDOW_LEN)
 
@@ -216,9 +227,7 @@ def compute_confidence_score(state: ClusterInvestigationState) -> float:
 
 
 def assess_risk(state: ClusterInvestigationState, topology: TopologyCache) -> ClusterInvestigationState:
-    """
-    Runs Stage 3 risk evaluation on an investigated cluster state.
-    """
+    """Runs Stage 3 risk evaluation on an investigated cluster state."""
     compute_physical_deviations(state)
     assign_segment_metadata(state, topology)
 
@@ -230,7 +239,7 @@ def assess_risk(state: ClusterInvestigationState, topology: TopologyCache) -> Cl
     elif state.classification == Classification.INSUFFICIENT_DATA:
         from aia.config import API_UNAVAILABLE_FALLBACK_TIER
         state.severity_tier = API_UNAVAILABLE_FALLBACK_TIER
-    else:  # CONFIRMED_ANOMALY
+    else:
         state.severity_tier = assign_severity_tier(state)
         state.estimated_volume_loss_lpm = estimate_volume_loss_lpm(state)
 

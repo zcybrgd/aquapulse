@@ -42,12 +42,13 @@ INVESTIGATION_AGENT_PORT="${INVESTIGATION_AGENT_PORT:-${AGENT_PORT}}"
 export INVESTIGATION_AGENT_URL="${INVESTIGATION_AGENT_URL:-http://127.0.0.1:${INVESTIGATION_AGENT_PORT:-8002}}"
 export NETWORK_AGENT_URL="${NETWORK_AGENT_URL:-http://127.0.0.1:${NETWORK_AGENT_PORT:-9001}}"
 export RESPONSE_AGENT_URL="${RESPONSE_AGENT_URL:-http://127.0.0.1:${NETWORK_RELEASE_PORT:-8004}}"
-export AGENT_INTEGRATION_ENABLED="${AGENT_INTEGRATION_ENABLED:-false}"
-export INVESTIGATION_AGENT_ENABLED="${INVESTIGATION_AGENT_ENABLED:-false}"
-export NETWORK_AGENT_ENABLED="${NETWORK_AGENT_ENABLED:-false}"
-export RESPONSE_AGENT_ENABLED="${RESPONSE_AGENT_ENABLED:-false}"
+export AGENT_INTEGRATION_ENABLED="${AGENT_INTEGRATION_ENABLED:-true}"
+export INVESTIGATION_AGENT_ENABLED="${INVESTIGATION_AGENT_ENABLED:-true}"
+export NETWORK_AGENT_ENABLED="${NETWORK_AGENT_ENABLED:-true}"
+export RESPONSE_AGENT_ENABLED="${RESPONSE_AGENT_ENABLED:-true}"
 export AGENT_HEALTH_TIMEOUT_SECONDS="${AGENT_HEALTH_TIMEOUT_SECONDS:-2}"
 export AGENT_HEALTH_CACHE_SECONDS="${AGENT_HEALTH_CACHE_SECONDS:-15}"
+export WEBHOOK_URL="${WEBHOOK_URL:-https://7926-154-250-121-41.ngrok-free.app}"
 
 INSTALL_DEPS=true
 
@@ -386,7 +387,16 @@ start_service \
     --port "$AGENT_PORT" \
     --reload
 
-# Network Management Agent Release Server
+# Network Management Agent Webhook API (Port 9001)
+start_service \
+    "Network Agent Webhook API" \
+    "$NETWORK_AGENT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" uvicorn webhook_server:app \
+    --host 0.0.0.0 \
+    --port "$NETWORK_AGENT_PORT" \
+    --reload
+
+# Network Management Agent Release Server (Port 8004)
 start_service \
     "Network Agent Release Server" \
     "$NETWORK_AGENT_DIR" \
@@ -400,6 +410,7 @@ start_service \
     "Network Agent Listener" \
     "$ROOT_DIR" \
     env PYTHONPATH="$ROOT_DIR" python "$NETWORK_AGENT_DIR/runner.py"
+
 
 # Platform frontend
 start_service \

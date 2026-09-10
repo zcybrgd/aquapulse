@@ -5,16 +5,14 @@ import logging
 import uuid
 import redis
 from typing import Optional
-from pydantic import ValidationError
 from agents.network_agent.graph import graph
-from agents.network_agent.schemas import BatchInput, InvestigatedThreat
 from agents.network_agent.camara_api import camara_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("NMA.Runner")
 
-REDIS_HOST = "localhost"
-REDIS_PORT = 6379
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_CHANNEL = "aia:results"
 
 url = os.getenv("WEBHOOK_URL", "https://example.com")
@@ -28,10 +26,7 @@ def create_preprovisioned_slice(
     mnc: str = "30",
     max_wait_seconds: int = 500
 ) -> Optional[str]:
-    """
-    Ensures a mission-critical 5G slice is active in OPERATING state at startup.
-    Recreates the slice if absent or in a terminal state (DELETED/FAILED/REJECTED).
-    """
+    """Ensures a mission-critical 5G slice is active in OPERATING state at startup."""
     logger.info(f"[Startup] Checking pre-provisioned Mission-Critical Slice '{slice_base_name}'...")
     slice_id = slice_base_name
 
@@ -41,9 +36,7 @@ def create_preprovisioned_slice(
     except Exception:
         current_state = "NOT_FOUND"
 
-    # Trigger creation if not found OR if existing slice is in an inactive/terminal state
     if current_state in ["NOT_FOUND", "DELETED", "FAILED", "REJECTED"]:
-        # Append unique suffix if replacing a deleted/failed slice to prevent name collision in NaC
         if current_state != "NOT_FOUND":
             slice_id = f"{slice_base_name}-{uuid.uuid4().hex[:6]}"
             logger.info(f"Previous slice was '{current_state}'. Using new unique ID: '{slice_id}'")
@@ -54,7 +47,7 @@ def create_preprovisioned_slice(
                 slice_name=slice_id,
                 mcc=mcc,
                 mnc=mnc,
-                service_type=2,  # URLLC
+                service_type=2,
                 differentiator="AUTO",
                 notification_url=notification_url,
                 notification_auth_token=notification_auth_token
@@ -65,7 +58,6 @@ def create_preprovisioned_slice(
             os.environ["PREPROVISIONED_SLICE_ID"] = ""
             return None
 
-    # Poll state until OPERATING
     start_time = time.time()
     activation_requested = False
 
@@ -91,23 +83,11 @@ def create_preprovisioned_slice(
                 except Exception as act_err:
                     logger.warning(f"Activation call notice: {act_err}")
 
-        # Break loop immediately if the slice enters any unrecoverable state
         elif current_state in ["FAILED", "REJECTED", "DELETED"]:
             logger.error(f"Slice '{slice_id}' entered terminal state: '{current_state}'. Stopping poll.")
             break
 
         time.sleep(3)
-
-    logger.error(
-        f"[ERROR] Slice '{slice_id}' failed to reach OPERATING state within {max_wait_seconds}s. "
-        f"Cleaning up..."
-    )
-    
-    try:
-        camara_service.delete_slice_direct(slice_id)
-        logger.info(f"Successfully cleaned up stalled slice '{slice_id}'.")
-    except Exception as del_err:
-        logger.warning(f"Could not delete stalled slice '{slice_id}': {del_err}")
 
     os.environ["PREPROVISIONED_SLICE_ID"] = ""
     logger.error("[CRITICAL] Pre-provisioning failed. No active 5G slice is available for this run.")
@@ -133,23 +113,7 @@ def process_threats(threats: list[dict]):
 
     try:
         final_state = graph.invoke(initial_input)
-        output_payload = {}
-        for key, value in final_state.items():
-            if key == "messages":
-                output_payload["messages"] = [
-                    {
-                        "role": getattr(msg, "type", type(msg).__name__),
-                        "content": getattr(msg, "content", str(msg)),
-                        "tool_calls": getattr(msg, "tool_calls", [])
-                    }
-                    for msg in value
-                ]
-            else:
-                output_payload[key] = value
-
-        json_output = json.dumps(output_payload, indent=2, default=str)
-        logger.info(f"NMA Workflow Completed:\n{json_output}")
-
+        logger.info("NMA Workflow Completed successfully for %d request(s).", len(actionable_requests))
     except Exception as e:
         logger.error(f"Error during NMA execution: {e}", exc_info=True)
 
@@ -169,26 +133,25 @@ def start_listener():
         try:
             raw_data = message["data"].decode("utf-8")
             payload = json.loads(raw_data)
-            threats = []
 
-            if "investigated_threats" in payload:
-                batch = BatchInput.model_validate(payload)
-                threats = [t.model_dump() for t in batch.investigated_threats]
-            elif "anomaly_id" in payload:
-                threat = InvestigatedThreat.model_validate(payload)
-                threats = [threat.model_dump()]
+            raw_threats = payload.get("investigated_threats") or payload.get("threats") or []
+            if not raw_threats and "anomaly_id" in payload:
+                raw_threats = [payload]
+
+            threats = []
+            for t in raw_threats:
+                if isinstance(t, dict):
+                    if not t.get("device_id"):
+                        t["device_id"] = t.get("sensor_cluster_id") or "device-14-valve-A"
+                    threats.append(t)
 
             if threats:
                 process_threats(threats)
 
-        except (json.JSONDecodeError, ValidationError) as err:
-            logger.warning("Ignored non-matching payload on '%s': %s", REDIS_CHANNEL, err)
         except Exception as e:
             logger.error("Unexpected error processing Redis message: %s", e, exc_info=True)
 
 
-
 if __name__ == "__main__":
-    # Create the pre-provisioned slice on startup
     create_preprovisioned_slice()
     start_listener()

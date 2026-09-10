@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Literal
 from enum import IntEnum
+from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
+
 class SeverityTier(IntEnum):
-    TIER_1_MONITOR = 1  #log
-    TIER_2_ALERT = 2 # alert human operator
-    TIER_3_AUTONOMOUS = 3# autonomous valve isolation + simultaneous human alert
+    TIER_1_MONITOR = 1  # log
+    TIER_2_ALERT = 2  # alert human operator
+    TIER_3_AUTONOMOUS = 3  # autonomous valve isolation + simultaneous human alert
+
 
 class NetworkStatus(BaseModel):
     device_online: bool
@@ -43,6 +45,7 @@ class InvestigatedThreat(BaseModel):
     operator_justification: str
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confidence score from 0.0 to 1.0")
 
+
 class BatchInput(BaseModel):
     batch_id: str
     analysis_timestamp: str
@@ -50,28 +53,32 @@ class BatchInput(BaseModel):
     anomalies_detected_count: int
     investigated_threats: List[InvestigatedThreat]
 
+
 class RegionalBatch(BaseModel):
     zone_id: str = Field(..., description="Geographic zone or sensor cluster identifier")
     representative_device_id: Optional[str] = Field(None, description="Device ID or phone number used as proxy")
     requests: List[InvestigatedThreat] = Field(default_factory=list)
 
+
 class NetworkGrant(BaseModel):
     cluster_id: str
     incident_id: str
-    severity_tier: SeverityTier
+    severity_tier: Union[SeverityTier, int, str]
     guarantee_type: Literal["QoD", "slice"]
     session_id: str
     granted_at: datetime
     reasoning_trace: str
     expires_at: Optional[datetime] = None
 
+
 class NetworkDenied(BaseModel):
     cluster_id: str
     incident_id: str
-    severity_tier: SeverityTier
+    severity_tier: Union[SeverityTier, int, str]
     reasoning_trace: str
     fallback: Literal["SMS", "none"] = "SMS"
     denied_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class CongestionCheckResult(BaseModel):
     zone_id: str

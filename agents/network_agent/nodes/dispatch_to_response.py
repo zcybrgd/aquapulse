@@ -1,12 +1,5 @@
 """
-Dispatches finalized network decisions (QoD grants/denials, and any explicit
-deny regardless of guarantee type) to the Response Agent immediately.
-
-Slice grants are intentionally NOT dispatched here: request_network_slice
-only returns status="INITIATED", not a confirmed allocation. The real
-NetworkGrant for a slice is emitted later by webhook_server.py once the
-slice lifecycle reaches OPERATING (or a terminal failure), because that's
-the earliest point at which the guarantee is actually real.
+Dispatches finalized network decisions (grants and denials) to the Response Agent.
 """
 import json
 import logging
@@ -48,23 +41,21 @@ def _extract_emitted_decisions(messages: List[BaseMessage]) -> List[Dict[str, An
 def dispatch_node(state: Dict[str, Any]) -> Dict[str, Any]:
     messages = state.get("messages", [])
     dispatched = 0
-    skipped_slice_grants = 0
 
     for item in _extract_emitted_decisions(messages):
         decision = item["decision"]
         is_grant = item["tool"] == "emit_grant"
         device_id = item.get("device_id")
-        if is_grant and decision.get("guarantee_type") == "slice":
-            # Deferred: webhook_server will dispatch once the slice is OPERATING.
-            skipped_slice_grants += 1
-            continue
 
         try:
             dispatch_grant_or_deny(decision, is_grant=is_grant, device_id=device_id)
             dispatched += 1
         except Exception:
-            logger.exception( "dispatch_to_response_FAILED incident_id=%s tool=%s",
-                decision.get("incident_id"), item["tool"],)
+            logger.exception(
+                "dispatch_to_response_FAILED incident_id=%s tool=%s",
+                decision.get("incident_id"),
+                item["tool"],
+            )
 
-    logger.info("dispatch_node_complete dispatched=%d deferred_slice_grants=%d", dispatched, skipped_slice_grants)
+    logger.info("dispatch_node_complete dispatched=%d", dispatched)
     return {}

@@ -74,22 +74,35 @@ class MockCamaraClient:
 # ============================================================================
 
 DEVICE_ID_MAP: dict[str, str] = {
-    "cluster-desert-042": "+99999991001",
-    "cluster-desert-043": "+99999991001",
-    "cluster-desert-044": "+99999991003",
-    "cluster-desert-045": "+99999991001",
-    "cluster-desert-046": "+99999991001",
-    "device-14-valve-A": "+99999991001",
-    "device-offline-demo": "+99999991003",
-    "device-14-valve-A-fail": "+99999991001",
+    "cluster-desert-042": "+990100000000",
+    "cluster-desert-043": "+990100000000",
+    "cluster-desert-044": "+990100000003",
+    "cluster-desert-045": "+990100000000",
+    "cluster-desert-046": "+990100000000",
 }
 
 CLUSTER_CONGESTION_MAP: dict[str, CongestionLevel] = {
-    "cluster-desert-042": CongestionLevel.LOW,
-    "cluster-desert-043": CongestionLevel.LOW,
+    "cluster-desert-042": CongestionLevel.HIGH,
+    "cluster-desert-043": CongestionLevel.HIGH,
     "cluster-desert-044": CongestionLevel.LOW,
     "cluster-desert-045": CongestionLevel.LOW,
-    "cluster-desert-046": CongestionLevel.LOW,
+    "cluster-desert-046": CongestionLevel.HIGH,
+}
+
+DEVICE_ID_MAP: dict[str, str] = {
+    "cluster-desert-042": "+99999991000",
+    "cluster-desert-043": "+99999991001",
+    "cluster-desert-044": "+99999991000",
+    "cluster-desert-045": "+99999990404",
+    "cluster-desert-046": "+99999991000",
+}
+
+CLUSTER_CONGESTION_MAP: dict[str, CongestionLevel] = {
+    "cluster-desert-042": CongestionLevel.HIGH,
+    "cluster-desert-043": CongestionLevel.HIGH,
+    "cluster-desert-044": CongestionLevel.HIGH,
+    "cluster-desert-045": CongestionLevel.LOW,
+    "cluster-desert-046": CongestionLevel.HIGH,
 }
 
 # ============================================================================

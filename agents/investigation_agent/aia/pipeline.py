@@ -55,58 +55,94 @@ class RetryTracker:
 @dataclass
 class ActiveIncidentTracker:
     """
-    Tracks active leak incidents per cluster to suppress duplicate alerts and
-    prevent downstream LLM rate-limit exhaustion during ongoing leaks,
-    while allowing immediate re-alerting if severity escalates (e.g. Tier 2 -> Tier 3).
+    Tracks active leak incidents per cluster to guarantee EXACTLY ONE alert 
+    is dispatched per fault injection lifecycle.
+    
+    Suppresses all duplicate alerts while a leak is active, and requires
+    consecutive normal telemetry cycles before clearing the incident state.
     """
 
-    active_incidents: dict[str, float] = field(default_factory=dict)
-    active_tiers: dict[str, int] = field(default_factory=dict)
-    normal_counts: dict[str, int] = field(default_factory=dict)
-    cooldown_seconds: float = 300.0  # 5-minute cooldown before re-alerting on same cluster
+    active_incidents: dict[str, float] = field(default_factory=dict)  # cluster_id -> start_time
+    active_tiers: dict[str, int] = field(default_factory=dict)        # cluster_id -> tier
+    normal_counts: dict[str, int] = field(default_factory=dict)       # cluster_id -> consecutive normal count
+    cooldown_seconds: float = 600.0  # 10-minute maximum safety incident lifetime
+    normal_clear_threshold: int = 3  # Require 3 consecutive normal batches to clear incident
 
-    def is_suppressed(self, cluster_id: str, new_tier: int = 1) -> bool:
-        return self.should_suppress(cluster_id, new_tier)
-
-    def should_suppress(self, cluster_id: str, new_tier: int = 1) -> bool:
+    def is_active(self, cluster_id: str) -> bool:
+        """Returns True if cluster is currently handling an active, alerted fault incident."""
         if cluster_id not in self.active_incidents:
             return False
 
-        prev_tier = self.active_tiers.get(cluster_id, 1)
-
-        # Tier escalation bypasses cooldown suppression
-        if new_tier > prev_tier:
+        elapsed = time.monotonic() - self.active_incidents[cluster_id]
+        if elapsed > self.cooldown_seconds:
             logger.info(
-                "Cluster %s severity escalated from Tier %d to Tier %d; bypassing suppression.",
+                "Active incident for cluster %s exceeded safety max lifetime (%.0fs); auto-clearing.",
                 cluster_id,
-                prev_tier,
-                new_tier,
+                elapsed,
             )
+            self.clear(cluster_id)
             return False
 
-        elapsed = time.monotonic() - self.active_incidents[cluster_id]
-        return elapsed < self.cooldown_seconds
+        return True
+
+    def is_suppressed(self, cluster_id: str, new_tier: int = 1) -> bool:
+        return self.is_active(cluster_id)
+
+    def should_suppress(self, cluster_id: str, new_tier: int = 1) -> bool:
+        return self.is_active(cluster_id)
+
+    def register_incident(self, cluster_id: str, tier: int = 1) -> bool:
+        """
+        Registers a new incident for cluster_id.
+        Returns True if this is a NEW incident (primary alert SHOULD be dispatched).
+        Returns False if incident is ALREADY active (alert MUST be suppressed).
+        """
+        if self.is_active(cluster_id):
+            self.normal_counts[cluster_id] = 0  # Telemetry still anomalous; reset clear counter
+            return False
+
+        now = time.monotonic()
+        self.active_incidents[cluster_id] = now
+        self.active_tiers[cluster_id] = tier
+        self.normal_counts[cluster_id] = 0
+        logger.info("New fault incident registered for cluster %s (Tier %d). Dispatching primary alert.", cluster_id, tier)
+        return True
 
     def mark_active(self, cluster_id: str, tier: int = 1) -> None:
-        self.update_incident(cluster_id, tier)
+        self.register_incident(cluster_id, tier)
 
     def update_incident(self, cluster_id: str, tier: int = 1) -> None:
-        self.active_incidents[cluster_id] = time.monotonic()
-        current_max = self.active_tiers.get(cluster_id, 1)
-        self.active_tiers[cluster_id] = max(tier, current_max)
-        self.normal_counts[cluster_id] = 0
+        if self.is_active(cluster_id):
+            self.active_tiers[cluster_id] = max(tier, self.active_tiers.get(cluster_id, 1))
+            self.normal_counts[cluster_id] = 0
+        else:
+            self.register_incident(cluster_id, tier)
 
-    def record_normal(self, cluster_id: str) -> None:
+    def record_normal(self, cluster_id: str) -> bool:
+        """
+        Records a normal telemetry window.
+        Clears active incident state once normal_clear_threshold is reached.
+        """
         if cluster_id in self.active_incidents:
             self.normal_counts[cluster_id] = self.normal_counts.get(cluster_id, 0) + 1
-            if self.normal_counts[cluster_id] >= 2:
+            logger.debug(
+                "Cluster %s recorded normal window (%d/%d required to clear active incident).",
+                cluster_id,
+                self.normal_counts[cluster_id],
+                self.normal_clear_threshold,
+            )
+            if self.normal_counts[cluster_id] >= self.normal_clear_threshold:
                 logger.info(
-                    "Cluster %s telemetry returned to normal; clearing active incident state.",
+                    "Cluster %s telemetry restored to normal for %d consecutive cycles. Clearing active incident.",
                     cluster_id,
+                    self.normal_clear_threshold,
                 )
                 self.clear(cluster_id)
+                return True
+        return False
 
     def clear(self, cluster_id: str) -> None:
+        """Clears active incident state for cluster_id."""
         self.active_incidents.pop(cluster_id, None)
         self.active_tiers.pop(cluster_id, None)
         self.normal_counts.pop(cluster_id, None)
@@ -124,7 +160,7 @@ class AnomalyInvestigationAgent:
         llm_model: str = "openai/gpt-oss-20b",
         retry_tracker: Optional[RetryTracker] = None,
         incident_tracker: Optional[ActiveIncidentTracker] = None,
-        cooldown_seconds: float = 300.0,
+        cooldown_seconds: float = 600.0,
         max_workers: int = 4,
     ):
         from aia.graph.builder import build_investigation_graph
@@ -140,7 +176,6 @@ class AnomalyInvestigationAgent:
         )
         self._max_workers = max_workers
 
-        # Default to central rate-limited LLM client if none explicitly injected
         if llm_client is None and get_groq_llm is not None:
             try:
                 llm_client = get_groq_llm()
@@ -154,24 +189,7 @@ class AnomalyInvestigationAgent:
             model=llm_model,
         )
 
-    # -- Helper for fast pre-check estimation -----------------------------
-
-    def _estimate_quick_tier(self, window: TelemetryWindow) -> int:
-        """Fast rule-based estimation of severity tier prior to LLM/LangGraph invocation."""
-        readings = window.readings
-        if not readings or len(readings) < 2:
-            return 1
-        p_start, p_end = readings[0].pressure_psi, readings[-1].pressure_psi
-        if p_start <= 0:
-            return 1
-        drop_pct = ((p_start - p_end) / p_start) * 100.0
-        if drop_pct >= 25.0:
-            return 3
-        elif drop_pct >= 10.0:
-            return 2
-        return 1
-
-    # -- Stage 1 --------------------------------------------------------
+    # -- Stage 1 Detection & Filtering -----------------------------------
 
     def _run_detection(self, batch: StreamingBatch) -> tuple[list[TelemetryWindow], int]:
         suspicious: list[TelemetryWindow] = []
@@ -191,15 +209,13 @@ class AnomalyInvestigationAgent:
                 pipe_material=pipe_material,
             )
             if result.is_suspicious:
-                # Pre-investigation suppression check:
-                # Avoid invoking expensive LLM calls if active incident is under cooldown
-                # AND estimated physical severity tier has not escalated.
-                est_tier = self._estimate_quick_tier(window)
-                if self.incident_tracker.should_suppress(cluster_id, est_tier):
+                # Pre-investigation active incident suppression:
+                # If an incident is ALREADY active and alerted for this cluster,
+                # suppress redundant LLM calls and avoid issuing duplicate alerts.
+                if self.incident_tracker.is_active(cluster_id):
                     logger.info(
-                        "Cluster %s threat (Tier %d) suppressed pre-investigation (active incident under cooldown).",
+                        "Cluster %s threat suppressed pre-investigation (active incident already alerted).",
                         cluster_id,
-                        est_tier,
                     )
                     self.telemetry_store.archive_normal_window(window)
                 else:
@@ -210,7 +226,7 @@ class AnomalyInvestigationAgent:
                 self.telemetry_store.archive_normal_window(window)
         return suspicious, len(batch.telemetry_windows)
 
-    # -- Stages 2-4 (per cluster, via LangGraph) -------------------------
+    # -- Stages 2-4 Investigation Workflows ------------------------------
 
     def _investigate_cluster(self, window: TelemetryWindow) -> ClusterInvestigationState:
         state = ClusterInvestigationState(
@@ -227,16 +243,13 @@ class AnomalyInvestigationAgent:
             )
         except Exception as exc:
             logger.error(
-                "LangGraph execution error for cluster %s (likely 429 rate limit): %s. Applying heuristic fallback.",
+                "LangGraph execution error for cluster %s: %s. Applying fallback state.",
                 window.sensor_cluster_id,
                 exc,
             )
-            # Safe heuristic fallback state during API rate limits
             final_state = state
             final_state.classification = Classification.CONFIRMED_ANOMALY
-            final_state.operator_justification = (
-                f"Heuristic fallback applied due to upstream API rate limit or execution error: {exc}"
-            )
+            final_state.operator_justification = f"Fallback state applied due to upstream error: {exc}"
 
         if final_state.classification == Classification.INSUFFICIENT_DATA:
             cycles = self.retry_tracker.record_insufficient_data(window.sensor_cluster_id)
@@ -251,18 +264,13 @@ class AnomalyInvestigationAgent:
     def _investigate_clusters_parallel(
         self, windows: list[TelemetryWindow]
     ) -> list[ClusterInvestigationState]:
-        """
-        Process multiple suspicious clusters in parallel using a thread pool.
-        Each cluster gets its own LangGraph invocation (Stages 2-4).
-        """
         if len(windows) <= 1:
             return [self._investigate_cluster(w) for w in windows] if windows else []
 
         results: list[ClusterInvestigationState] = []
         with ThreadPoolExecutor(max_workers=min(self._max_workers, len(windows))) as executor:
             future_to_window = {
-                executor.submit(self._investigate_cluster, w): w
-                for w in windows
+                executor.submit(self._investigate_cluster, w): w for w in windows
             }
             for future in as_completed(future_to_window):
                 try:
@@ -274,12 +282,20 @@ class AnomalyInvestigationAgent:
                     )
         return results
 
-    @staticmethod
-    def _to_investigated_threat(state: ClusterInvestigationState) -> InvestigatedThreat:
+    def _to_investigated_threat(self, state: ClusterInvestigationState) -> InvestigatedThreat:
+        """Converts internal cluster state to output InvestigatedThreat model."""
+        segment = self.topology.get_segment_for_cluster(state.sensor_cluster_id)
+        dev_id = (
+            getattr(state, "device_id", None)
+            or (segment.representative_device_id if segment and hasattr(segment, "representative_device_id") else None)
+            or (state.window.device_id if hasattr(state.window, "device_id") else None)
+            or "device-14-valve-A"
+        )
         return InvestigatedThreat(
             anomaly_id=state.anomaly_id,
             sensor_cluster_id=state.sensor_cluster_id,
             segment_id=state.segment_id or f"unknown-{state.sensor_cluster_id}",
+            device_id=dev_id,
             classification=state.classification,
             severity_tier=state.severity_tier or 1,
             network_status=NetworkStatus(
@@ -310,14 +326,12 @@ class AnomalyInvestigationAgent:
             confidence_score=state.confidence_score or 0.0,
         )
 
-    # -- Public entry point ------------------------------------------------
+    # -- Public Entry Point ------------------------------------------------
 
     def process_batch(self, batch: StreamingBatch) -> AIABatchOutputPayload:
         start = time.monotonic()
 
         suspicious_windows, total_clusters = self._run_detection(batch)
-
-        # Process suspicious clusters in parallel
         investigated_states = self._investigate_clusters_parallel(suspicious_windows)
 
         if check_platform_wide_outage(investigated_states):
@@ -338,19 +352,24 @@ class AnomalyInvestigationAgent:
                 )
 
             cluster_id = s.sensor_cluster_id
-            tier = s.severity_tier or 1
 
-            # Post-investigation check
-            if self.incident_tracker.should_suppress(cluster_id, tier):
-                logger.info(
-                    "Cluster %s threat (Tier %d) suppressed post-investigation (active incident under cooldown).",
-                    cluster_id,
-                    tier,
-                )
-                self.telemetry_store.archive_normal_window(s.window)
+            if s.classification == Classification.CONFIRMED_ANOMALY:
+                tier = s.severity_tier or 1
+                # Register incident & check if this is the FIRST alert for this fault injection
+                if self.incident_tracker.register_incident(cluster_id, tier=tier):
+                    active_threats.append(self._to_investigated_threat(s))
+                    logger.info(
+                        "DISPATCHING ALERT: Confirmed anomaly on Cluster %s (Severity Tier %d).",
+                        cluster_id,
+                        tier,
+                    )
+                else:
+                    logger.info(
+                        "Cluster %s threat suppressed post-investigation (incident already active).",
+                        cluster_id,
+                    )
             else:
-                self.incident_tracker.update_incident(cluster_id, tier)
-                active_threats.append(self._to_investigated_threat(s))
+                self.telemetry_store.archive_normal_window(s.window)
 
         elapsed = time.monotonic() - start
         logger.info(
