@@ -39,12 +39,11 @@ export function AgentFindingTable({ items }: { items: AgentFindingRecord[] }) {
         <thead className="bg-page text-xs font-medium uppercase tracking-wide text-ink-muted">
           <tr>
             <th className="w-[16%] px-4 py-3">Cluster</th>
-            <th className="w-[20%] px-4 py-3">Classification</th>
+            <th className="w-[22%] px-4 py-3">Classification</th>
             <th className="w-[16%] px-4 py-3">Severity</th>
-            <th className="w-[10%] px-4 py-3">Confidence</th>
-            <th className="w-[12%] px-4 py-3">Mapping</th>
-            <th className="w-[14%] px-4 py-3">Assessed</th>
-            <th className="w-[12%] px-4 py-3">Action</th>
+            <th className="w-[14%] px-4 py-3">Mapping</th>
+            <th className="w-[16%] px-4 py-3">Assessed</th>
+            <th className="w-[16%] px-4 py-3">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -60,7 +59,6 @@ export function AgentFindingTable({ items }: { items: AgentFindingRecord[] }) {
                   {item.severity_label}
                 </Badge>
               </td>
-              <td className="px-4 py-3 align-top text-ink">{item.confidence_score.toFixed(2)}</td>
               <td className="px-4 py-3 align-top text-ink-muted">
                 {item.mapped_detection_id ?? item.mapping_status}
               </td>

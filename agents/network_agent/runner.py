@@ -2,9 +2,11 @@ import os
 import json
 import time
 import logging
+import threading
 import uuid
 import redis
 from typing import Optional
+from urllib.parse import urlparse
 from pydantic import ValidationError
 from agents.network_agent.graph import graph
 from agents.network_agent.schemas import BatchInput, InvestigatedThreat
@@ -13,8 +15,14 @@ from agents.network_agent.camara_api import camara_service
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger("NMA.Runner")
 
-REDIS_HOST = "localhost"
-REDIS_PORT = 6379
+_redis_url = os.getenv("REDIS_URL")
+if _redis_url:
+    _parsed = urlparse(_redis_url)
+    REDIS_HOST = _parsed.hostname or "127.0.0.1"
+    REDIS_PORT = int(_parsed.port or 6379)
+else:
+    REDIS_HOST = os.getenv("REDIS_HOST", "127.0.0.1")
+    REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_CHANNEL = "aia:results"
 
 url = os.getenv("WEBHOOK_URL", "https://example.com")
@@ -154,6 +162,24 @@ def process_threats(threats: list[dict]):
         logger.error(f"Error during NMA execution: {e}", exc_info=True)
 
 
+def start_readiness_server(port: int | None = None) -> None:
+    """Serve GET /health for AquaPulse readiness probes. No /v1/contract."""
+    from fastapi import FastAPI
+    import uvicorn
+
+    listen_port = int(port or os.getenv("NETWORK_AGENT_PORT", "9001"))
+    health_app = FastAPI(title="AquaPulse Network Agent Readiness")
+
+    @health_app.get("/health")
+    def health() -> dict:
+        return {"status": "ok", "service": "network_management_agent"}
+
+    config = uvicorn.Config(health_app, host="0.0.0.0", port=listen_port, log_level="warning")
+    server = uvicorn.Server(config)
+    threading.Thread(target=server.run, name="nma-health", daemon=True).start()
+    logger.info("NMA readiness server listening on http://127.0.0.1:%s/health", listen_port)
+
+
 def start_listener():
     logger.info("Connecting to Redis at %s:%d...", REDIS_HOST, REDIS_PORT)
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
@@ -189,6 +215,7 @@ def start_listener():
 
 
 if __name__ == "__main__":
+    start_readiness_server()
     # Create the pre-provisioned slice on startup
     create_preprovisioned_slice()
     start_listener()

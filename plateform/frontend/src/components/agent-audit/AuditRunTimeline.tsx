@@ -1,47 +1,71 @@
-import type { AgentAuditEventDetail, AgentAuditRunDetail } from "../../types/agentAudit";
-import { agentCodeLabel, eventTypeLabel, stageLabel } from "../../lib/agentAudit";
-import { auditTimelineHeading, eventWarning, statusLabel } from "../../lib/agentAuditDisplay";
+import type { AgentAuditRunDetail } from "../../types/agentAudit";
+import {
+  auditTimelineHeading,
+  runTimelineItems,
+  statusLabel,
+  type RunTimelineExtras,
+  type RunTimelineItem,
+} from "../../lib/agentAuditDisplay";
 import { formatDateTime } from "../../lib/format";
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
 import { AuditStatusBadge } from "./AuditStatusBadge";
 
-function EventCard({ event }: { event: AgentAuditEventDetail }) {
-  const warning = eventWarning(event);
+function TimelineCard({ item }: { item: RunTimelineItem }) {
   return (
     <Card className="min-w-0 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-          {stageLabel(event.pipeline_stage)} · {event.event_type.replaceAll("_", " ")}
+          {item.stage} · {item.eventType.replaceAll("_", " ")}
         </p>
-        <AuditStatusBadge value={event.status} label={statusLabel(event.status)} />
+        <AuditStatusBadge value={item.status} label={statusLabel(item.status)} />
       </div>
-      <p className="mt-1 font-medium text-ink">{eventTypeLabel(event)}</p>
+      <p className="mt-1 font-medium text-ink">{item.title}</p>
       <p className="text-sm text-ink-muted">
-        {agentCodeLabel(event.agent_code)} · {formatDateTime(event.occurred_at)}
+        {item.agentLabel} · {formatDateTime(item.occurredAt)}
       </p>
-      <p className="mt-2 text-sm text-ink">{event.summary}</p>
-      {warning ? <p className="mt-2 text-sm text-warning">{warning}</p> : null}
-      {event.error_code ? <p className="mt-2 text-sm text-warning">Validation / mapping: {event.error_code}</p> : null}
+      <p className="mt-2 text-sm text-ink">{item.summary}</p>
+      {item.warning ? <p className="mt-2 text-sm text-warning">{item.warning}</p> : null}
+      {item.errorCode ? <p className="mt-2 text-sm text-warning">Validation / mapping: {item.errorCode}</p> : null}
     </Card>
   );
 }
 
-export function AuditRunTimeline({ run }: { run: AgentAuditRunDetail }) {
+export function AuditRunTimeline({
+  run,
+  extras = {},
+}: {
+  run: AgentAuditRunDetail;
+  extras?: RunTimelineExtras;
+}) {
+  const items = runTimelineItems(run, extras);
   const heading = auditTimelineHeading(run);
-  if (run.events.length === 0) {
+  const derived = items.length > 0 && items.every((item) => item.derived);
+
+  if (items.length === 0) {
     return (
       <section>
         <h3 className="text-base font-semibold text-ink">Audit timeline</h3>
-        <EmptyState title="No audit events recorded" description="Events will appear here after a real agent run." />
+        <EmptyState
+          title="No audit events recorded"
+          description="No start time or audit events are stored for this run."
+        />
       </section>
     );
   }
+
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-base font-semibold text-ink">{heading}</h3>
-      {run.events.map((event) => (
-        <EventCard key={event.id} event={event} />
+      <div>
+        <h3 className="text-base font-semibold text-ink">{heading}</h3>
+        {derived ? (
+          <p className="mt-1 text-sm text-ink-muted">
+            Derived from the stored run. The agent did not emit per-stage audit events.
+          </p>
+        ) : null}
+      </div>
+      {items.map((item) => (
+        <TimelineCard key={item.key} item={item} />
       ))}
     </section>
   );

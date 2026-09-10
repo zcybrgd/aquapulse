@@ -23,8 +23,10 @@ TESTBED_DIR="$ROOT_DIR/water-pipeline-testbed"
 AGENT_DIR="$ROOT_DIR/agents/investigation_agent"
 
 NETWORK_AGENT_DIR="$ROOT_DIR/agents/network_agent"
+RESPONSE_AGENT_DIR="$ROOT_DIR/agents/response_agent"
 NETWORK_AGENT_PORT=9001
 NETWORK_RELEASE_PORT=8004
+RESPONSE_AGENT_PORT=9002
 
 PLATFORM_COMPOSE="$PLATFORM_DIR/docker-compose.yml"
 TESTBED_COMPOSE="$TESTBED_DIR/docker-compose.yml"
@@ -41,13 +43,15 @@ FRONTEND_PORT=5173
 INVESTIGATION_AGENT_PORT="${INVESTIGATION_AGENT_PORT:-${AGENT_PORT}}"
 export INVESTIGATION_AGENT_URL="${INVESTIGATION_AGENT_URL:-http://127.0.0.1:${INVESTIGATION_AGENT_PORT:-8002}}"
 export NETWORK_AGENT_URL="${NETWORK_AGENT_URL:-http://127.0.0.1:${NETWORK_AGENT_PORT:-9001}}"
-export RESPONSE_AGENT_URL="${RESPONSE_AGENT_URL:-http://127.0.0.1:${NETWORK_RELEASE_PORT:-8004}}"
+export RESPONSE_AGENT_URL="${RESPONSE_AGENT_URL:-http://127.0.0.1:${RESPONSE_AGENT_PORT:-9002}}"
 export AGENT_INTEGRATION_ENABLED="${AGENT_INTEGRATION_ENABLED:-false}"
 export INVESTIGATION_AGENT_ENABLED="${INVESTIGATION_AGENT_ENABLED:-false}"
 export NETWORK_AGENT_ENABLED="${NETWORK_AGENT_ENABLED:-false}"
 export RESPONSE_AGENT_ENABLED="${RESPONSE_AGENT_ENABLED:-false}"
 export AGENT_HEALTH_TIMEOUT_SECONDS="${AGENT_HEALTH_TIMEOUT_SECONDS:-2}"
 export AGENT_HEALTH_CACHE_SECONDS="${AGENT_HEALTH_CACHE_SECONDS:-15}"
+# Host port 6380 is the testbed Redis published by docker-compose (not Windows/WSL :6379).
+export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6380/0}"
 
 INSTALL_DEPS=true
 
@@ -138,7 +142,8 @@ Services:
     Testbed Dashboard   http://localhost:${TESTBED_DASHBOARD_PORT}
     AIA Agent API       http://localhost:${AGENT_PORT}
     Network Agent       http://localhost:${NETWORK_AGENT_PORT}
-    Response Agent      http://localhost:${NETWORK_RELEASE_PORT}
+    Network Release     http://localhost:${NETWORK_RELEASE_PORT}
+    Response Agent      http://localhost:${RESPONSE_AGENT_PORT}
     Platform Frontend   http://localhost:${FRONTEND_PORT}
 
 Docker:
@@ -308,19 +313,31 @@ section "5. Starting Docker infrastructure"
 
 log "Starting AquaPulse platform stack..."
 
-docker compose \
-    -f "$PLATFORM_COMPOSE" \
-    up -d --build
+if docker inspect aquapulse-db >/dev/null 2>&1; then
+    if [[ "$(docker inspect -f '{{.State.Running}}' aquapulse-db)" == "true" ]]; then
+        log "Reusing existing aquapulse-db container."
+    else
+        log "Starting existing aquapulse-db container..."
+        docker start aquapulse-db >/dev/null
+    fi
+else
+    docker compose \
+        --env-file "$BACKEND_DIR/.env" \
+        -f "$PLATFORM_COMPOSE" \
+        up -d
+fi
 
-success "Platform Docker stack started."
+success "Platform Docker stack ready."
 
 echo
 
 log "Starting water pipeline testbed..."
 
+# AquaPulse DB already binds host 5433. Skip testbed TimescaleDB to avoid that clash.
+# Agents in this launcher use Redis + the simulator, not the AIA Timescale instance.
 docker compose \
     -f "$TESTBED_COMPOSE" \
-    up -d --build
+    up -d redis simulator dashboard
 
 success "Water pipeline testbed started."
 
@@ -395,20 +412,26 @@ start_service \
     --port "$NETWORK_RELEASE_PORT" \
     --reload
 
-# Network Management Agent Listener (Redis Bridge)
+# Network Management Agent Listener (Redis Bridge + /health on NETWORK_AGENT_PORT)
 start_service \
     "Network Agent Listener" \
     "$ROOT_DIR" \
-    env PYTHONPATH="$ROOT_DIR" python "$NETWORK_AGENT_DIR/runner.py"
+    env PYTHONPATH="$ROOT_DIR" NETWORK_AGENT_PORT="$NETWORK_AGENT_PORT" python "$NETWORK_AGENT_DIR/runner.py"
 
-# Platform frontend
+# Response Agent readiness API (health + contract only)
+start_service \
+    "Response Agent" \
+    "$ROOT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" uvicorn agents.response_agent.api:app \
+    --host 0.0.0.0 \
+    --port "$RESPONSE_AGENT_PORT" \
+    --reload
+
+# Platform frontend (npx vite so host/port flags work on Windows npm)
 start_service \
     "Platform Frontend" \
     "$FRONTEND_DIR" \
-    npm run dev \
-    -- \
-    --host 0.0.0.0 \
-    --port "$FRONTEND_PORT"
+    npx vite --host 0.0.0.0 --port "$FRONTEND_PORT"
 
 # ----------------------------------------------------------------------------
 # 8. Startup Summary
@@ -430,7 +453,10 @@ ${GREEN}AIA Investigation Agent:${RESET}
 ${GREEN}Network Agent:${RESET}
     ${NETWORK_AGENT_URL}
 
-${GREEN}Response Agent / Network Release Server:${RESET}
+${GREEN}Network Release Server:${RESET}
+    http://localhost:${NETWORK_RELEASE_PORT}
+
+${GREEN}Response Agent:${RESET}
     ${RESPONSE_AGENT_URL}
 
 ${GREEN}Platform Frontend:${RESET}

@@ -163,10 +163,19 @@ describe("response agent result", () => {
 });
 
 describe("audit timeline", () => {
-  it("shows the empty timeline copy when no events exist", () => {
-    renderView(<AuditRunTimeline run={auditRun({ events: [] })} />);
-    expect(screen.getByText("No audit events recorded")).toBeInTheDocument();
-    expect(screen.getByText("Events will appear here after a real agent run.")).toBeInTheDocument();
+  it("derives a run timeline when the stored run has no audit events", () => {
+    renderView(
+      <AuditRunTimeline
+        run={auditRun({ events: [] })}
+        extras={{ analysisTimestamp: "2026-08-31T02:00:00Z", findingCount: 1 }}
+      />,
+    );
+    expect(screen.getByText("Run timeline")).toBeInTheDocument();
+    expect(screen.getByText("Result received")).toBeInTheDocument();
+    expect(screen.getByText("Agent analysis")).toBeInTheDocument();
+    expect(screen.getByText("Run completed")).toBeInTheDocument();
+    expect(screen.getByText(/Derived from the stored run/)).toBeInTheDocument();
+    expect(screen.queryByText("No audit events recorded")).not.toBeInTheDocument();
   });
 
   it("labels a running run with stored events as a partial timeline", () => {

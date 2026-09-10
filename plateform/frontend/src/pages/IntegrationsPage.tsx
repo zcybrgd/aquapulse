@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { RefreshCw, ShieldAlert } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import { AgentStatusCard } from "../components/integrations/AgentStatusCard";
 import { Button } from "../components/ui/Button";
@@ -76,30 +76,6 @@ export function IntegrationsPage() {
             <p className="mt-2 text-sm text-ink-muted">{readiness.advisory_notice}</p>
             <p className="mt-1 text-sm text-ink-muted">{readiness.actuation_notice}</p>
           </Card>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">CAMARA</p>
-              <p className="mt-2 font-semibold text-ink">
-                {readiness.safety.camara_enabled ? "Enabled" : "Disabled"}
-              </p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Notifications</p>
-              <p className="mt-2 font-semibold text-ink">
-                {readiness.safety.notifications_enabled ? "Enabled" : "Disabled"}
-              </p>
-            </Card>
-            <Card className="p-4">
-              <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                <ShieldAlert size={14} aria-hidden="true" />
-                Physical commands
-              </p>
-              <p className="mt-2 font-semibold text-ink">
-                {readiness.safety.physical_commands_enabled ? "Enabled" : "Disabled"}
-              </p>
-            </Card>
-          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="p-5">

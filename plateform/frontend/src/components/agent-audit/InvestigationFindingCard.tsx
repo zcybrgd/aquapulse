@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 
 import {
   classificationLabel,
-  confidencePercent,
   formatOptionalBoolean,
   formatOptionalInteger,
   formatOptionalNumber,
@@ -10,17 +9,15 @@ import {
   formatOptionalText,
   formatOptionalTimestamp,
   networkField,
-  readEstimatedVolumeLoss,
+  formatEstimatedVolumeLoss,
   statusLabel,
   UNAVAILABLE,
   type InvestigationFindingView,
 } from "../../lib/agentAuditDisplay";
-import { formatPercent } from "../../lib/format";
 import { SafeMarkdown } from "../../lib/safeMarkdown";
 import { Card } from "../ui/Card";
 import { AuditStatusBadge } from "./AuditStatusBadge";
 import { MetricGrid, MetricItem } from "./MetricGrid";
-import { TermTooltip } from "./TermTooltip";
 
 const severityHint: Record<number, string> = {
   1: "Tier 1 / monitor",
@@ -28,9 +25,8 @@ const severityHint: Record<number, string> = {
   3: "Tier 3 / critical recommendation requiring platform safety policy",
 };
 
-export function InvestigationFindingCard({ finding }: { finding: InvestigationFindingView }) {
-  const percent = finding.confidence == null ? null : confidencePercent(finding.confidence);
-  const volumeLoss = readEstimatedVolumeLoss(finding.physical);
+export function FindingEvidenceSections({ finding }: { finding: InvestigationFindingView }) {
+  const volumeLoss = formatEstimatedVolumeLoss(finding.physical);
   const reachable = networkField(finding.network, "device_reachable", "reachable");
   const camara = networkField(finding.network, "camara_reachability_status", "camara_reachability");
   const congestion = networkField(finding.network, "camara_congestion_level", "congestion_level");
@@ -38,63 +34,16 @@ export function InvestigationFindingCard({ finding }: { finding: InvestigationFi
   const degraded = networkField(finding.network, "network_degraded", "degraded");
 
   return (
-    <details className="group min-w-0 rounded-2xl border border-line bg-white open:shadow-card">
-      <summary className="cursor-pointer list-none px-4 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal [&::-webkit-details-marker]:hidden">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <AuditStatusBadge value={finding.classification} label={classificationLabel(finding.classification)} />
-            <AuditStatusBadge
-              value={finding.severityTier === 3 ? "blocked" : finding.severityTier === 2 ? "validating" : "ready"}
-              label={`Severity tier ${finding.severityTier}`}
-            />
-            <AuditStatusBadge value={finding.mappingStatus} label={statusLabel(finding.mappingStatus)} />
-            <span className="text-xs text-ink-muted group-open:hidden">Show details</span>
-            <span className="hidden text-xs text-ink-muted group-open:inline">Hide details</span>
-          </div>
-          <p className="text-sm font-medium text-critical">Agent assessment — not independently confirmed</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <p className="min-w-0 break-words text-sm text-ink">
-              <span className="text-ink-muted">Sensor cluster </span>
-              {finding.clusterId ?? UNAVAILABLE}
-            </p>
-            <p className="min-w-0 break-words text-sm text-ink">
-              <span className="text-ink-muted">Segment </span>
-              {finding.segmentId ?? UNAVAILABLE}
-            </p>
-          </div>
-          {percent == null ? null : (
-            <div>
-              <p className="text-xs text-ink-muted">
-                <TermTooltip term="Agent-reported confidence between 0 and 100 percent">Confidence</TermTooltip>{" "}
-                {formatPercent(percent, 0)}
-              </p>
-              <div
-                className="mt-1 h-2 overflow-hidden rounded-full bg-page"
-                role="progressbar"
-                aria-label="Confidence"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percent}
-              >
-                <div className="h-full rounded-full bg-teal motion-reduce:transition-none" style={{ width: `${percent}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-      </summary>
-
-      <div className="space-y-5 border-t border-line px-4 py-4">
+    <div className="space-y-5">
         <section>
           <h4 className="text-sm font-semibold text-ink">Physical deviations</h4>
           <MetricGrid>
             <MetricItem label="Pressure drop" value={formatOptionalPercent(finding.physical.pressure_drop_pct)} hint="Percent pressure drop reported by the agent" />
             <MetricItem label="Flow surge" value={formatOptionalPercent(finding.physical.flow_surge_pct)} />
-            <MetricItem label="Pressure slope" value={formatOptionalNumber(finding.physical.pressure_slope, 4)} />
-            <MetricItem label="Flow slope" value={formatOptionalNumber(finding.physical.flow_slope, 4)} />
+            <MetricItem label="Pressure slope" value={formatOptionalNumber(finding.physical.pressure_slope, 4, " psi/min")} />
+            <MetricItem label="Flow slope" value={formatOptionalNumber(finding.physical.flow_slope, 4, " lps/min")} />
             <MetricItem label="Stale pre-outage data" value={formatOptionalBoolean(finding.physical.is_stale_pre_outage_data)} />
-            {volumeLoss !== null ? (
-              <MetricItem label="Estimated volume loss" value={`${formatOptionalNumber(volumeLoss, 1)} m³`} />
-            ) : null}
+            {volumeLoss !== null ? <MetricItem label="Estimated volume loss" value={volumeLoss} /> : null}
           </MetricGrid>
         </section>
 
@@ -145,6 +94,41 @@ export function InvestigationFindingCard({ finding }: { finding: InvestigationFi
             ) : null}
           </MetricGrid>
         </section>
+    </div>
+  );
+}
+
+export function InvestigationFindingCard({ finding }: { finding: InvestigationFindingView }) {
+  return (
+    <details className="group min-w-0 rounded-2xl border border-line bg-white open:shadow-card">
+      <summary className="cursor-pointer list-none px-4 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal [&::-webkit-details-marker]:hidden">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <AuditStatusBadge value={finding.classification} label={classificationLabel(finding.classification)} />
+            <AuditStatusBadge
+              value={finding.severityTier === 3 ? "blocked" : finding.severityTier === 2 ? "validating" : "ready"}
+              label={`Severity tier ${finding.severityTier}`}
+            />
+            <AuditStatusBadge value={finding.mappingStatus} label={statusLabel(finding.mappingStatus)} />
+            <span className="text-xs text-ink-muted group-open:hidden">Show details</span>
+            <span className="hidden text-xs text-ink-muted group-open:inline">Hide details</span>
+          </div>
+          <p className="text-sm font-medium text-critical">Agent assessment — not independently confirmed</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <p className="min-w-0 break-words text-sm text-ink">
+              <span className="text-ink-muted">Sensor cluster </span>
+              {finding.clusterId ?? UNAVAILABLE}
+            </p>
+            <p className="min-w-0 break-words text-sm text-ink">
+              <span className="text-ink-muted">Segment </span>
+              {finding.segmentId ?? UNAVAILABLE}
+            </p>
+          </div>
+        </div>
+      </summary>
+
+      <div className="space-y-5 border-t border-line px-4 py-4">
+        <FindingEvidenceSections finding={finding} />
 
         <section>
           <h4 className="text-sm font-semibold text-ink">Operator justification</h4>
