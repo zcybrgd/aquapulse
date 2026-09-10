@@ -44,9 +44,9 @@ The AIA operates as a tightly choreographed 4-stage pipeline, transitioning from
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │  STAGE 2: ANOMALY INVESTIGATION (Network vs. Asset Disambiguation)                           │
 │                                                                                              │
-│  - Query CAMARA Device Reachability Status API. If failed, handle API timeouts/errors.        │
+│  - Query CAMARA Device Reachability Status API. If failed, handle API timeouts/errors.       │
 │  - Query CAMARA Congestion Insights API if unreachable. Inspect local temperatures (> 50°C). │
-│  - Output Classifications: confirmed_anomaly, likely_connectivity_artifact,                 │
+│  - Output Classifications: confirmed_anomaly, likely_connectivity_artifact,                  │
 │    confirmed_instrument_fault, or insufficient_data (with scheduled retry).                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────┘
                                                │
@@ -54,7 +54,7 @@ The AIA operates as a tightly choreographed 4-stage pipeline, transitioning from
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │  STAGE 3: DETERMINISTIC RISK ASSESSMENT & SEVERITY TIERING                                   │
 │                                                                                              │
-│  - Retrieve Pipeline Topology (Segments, Criticality, Valves, Reservoirs) from local cache. │
+│  - Retrieve Pipeline Topology (Segments, Criticality, Valves, Reservoirs) from local cache.  │
 │  - Compute hydraulic rate of change (pressure and flow slopes) and trend deviations.         │
 │  - Assign Actionable Tiers (Tier 1, Tier 2, Tier 3) or route to maintenance ticket path.     │
 │  - Compute composite Confidence Score based on data quality, trend, and API certainty.       │
@@ -65,7 +65,7 @@ The AIA operates as a tightly choreographed 4-stage pipeline, transitioning from
 │  STAGE 4: AI NARRATION & OUTPUT COMPILATION                                                  │
 │                                                                                              │
 │  - LLM acts as a read-only narrator to synthesize Operator Justification Memo.               │
-│  - Validate payload against Pydantic schema; forward ONLY investigated threats to the NMA.  │
+│  - Validate payload against Pydantic schema; forward ONLY investigated threats to the NMA.   │
 └──────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
