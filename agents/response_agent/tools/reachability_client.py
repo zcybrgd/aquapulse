@@ -8,7 +8,7 @@ from ..schemas import ReachabilityStatus
 
 logger = logging.getLogger("actuation_agent.tools.reachability")
 
-# Known cluster/device ID to CAMARA MSISDN mappings
+# Strict map: Desert clusters only
 DEFAULT_DEVICE_MSISDN_MAP: dict[str, str] = {
     "cluster-desert-042": "+99999991000",
     "cluster-desert-043": "+99999991001",
@@ -16,6 +16,7 @@ DEFAULT_DEVICE_MSISDN_MAP: dict[str, str] = {
     "cluster-desert-045": "+99999990404",
     "cluster-desert-046": "+99999991000",
 }
+
 
 class DeviceReachabilityClient:
     def __init__(
@@ -43,12 +44,16 @@ class DeviceReachabilityClient:
         self._session.mount("https://", HTTPAdapter(max_retries=retries))
 
     def _resolve_target_identifier(self, device_id: str) -> str:
-        """Resolves cluster or device IDs to the expected CAMARA MSISDN format."""
+        """Resolves cluster IDs to standard CAMARA MSISDN format."""
         if device_id in self.device_msisdn_map:
             return self.device_msisdn_map[device_id]
         if device_id.startswith("+"):
             return device_id
-        return self.device_msisdn_map.get(device_id, device_id)
+
+        raise ValueError(
+            f"Identifier '{device_id}' is not a valid desert cluster or E.164 MSISDN. "
+            f"Allowed clusters: {list(self.device_msisdn_map.keys())}"
+        )
 
     def check(self, device_id: str) -> ReachabilityStatus:
         target_id = self._resolve_target_identifier(device_id)
@@ -58,22 +63,16 @@ class DeviceReachabilityClient:
         try:
             response = self._session.get(url, timeout=self.timeout_seconds)
 
-            # If MSISDN lookup returned 404 and target_id differed, retry with raw device_id
-            if response.status_code == 404 and target_id != device_id:
-                fallback_url = f"{self.base_url}/v1/device-reachability/{device_id}"
-                response = self._session.get(fallback_url, timeout=self.timeout_seconds)
-
-            # Handle sandbox/missing endpoint gracefully
             if response.status_code == 404:
                 logger.warning(
-                    "reachability_check returned 404 for device_id=%s (target_id=%s) — defaulting to reachable (True) for sandbox pipeline",
+                    "reachability_check returned 404 for device_id=%s (target_id=%s)",
                     device_id,
                     target_id,
                 )
                 return ReachabilityStatus(
                     device_id=device_id,
-                    reachable=True,
-                    raw_signal_quality="-75 dBm",
+                    reachable=False,
+                    raw_signal_quality="N/A",
                 )
 
             response.raise_for_status()
@@ -95,15 +94,22 @@ class DeviceReachabilityClient:
             )
             return status
 
-        except (requests.RequestException, ValueError, KeyError) as exc:
-            logger.warning(
-                "reachability_check error device_id=%s target_id=%s error=%s — defaulting to reachable (True) for sandbox pipeline",
+        except Exception as exc:
+            logger.error(
+                "reachability_check failed for device_id=%s target_id=%s error=%s",
                 device_id,
                 target_id,
                 exc,
             )
             return ReachabilityStatus(
                 device_id=device_id,
-                reachable=True,
-                raw_signal_quality="-75 dBm",
+                reachable=False,
+                raw_signal_quality="N/A",
             )
+
+
+# Standalone function required by reachability_check node
+def check_cluster_reachability(cluster_id: str) -> ReachabilityStatus:
+    """Wrapper function to perform reachability check for a given desert cluster."""
+    client = DeviceReachabilityClient()
+    return client.check(cluster_id)

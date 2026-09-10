@@ -5,7 +5,7 @@ import logging
 import threading
 import uuid
 import redis
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from agents.network_agent.graph import graph
 from agents.network_agent.camara_api import camara_service
 
@@ -19,6 +19,37 @@ REDIS_CHANNEL = "aia:results"
 url = os.getenv("WEBHOOK_URL", "https://example.com")
 notification_url = f"{url}/notifications"
 notification_auth_token = os.getenv("NOTIFICATION_AUTH_TOKEN", "Bearer test-token")
+
+VALID_DESERT_CLUSTERS = {
+    "cluster-desert-042",
+    "cluster-desert-043",
+    "cluster-desert-044",
+    "cluster-desert-045",
+    "cluster-desert-046",
+}
+
+
+def sanitize_threat_payload(threat: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures device and cluster fields strictly map to valid desert clusters."""
+    raw_target = (
+        threat.get("cluster_id")
+        or threat.get("sensor_cluster_id")
+        or threat.get("device_id")
+    )
+
+    if raw_target not in VALID_DESERT_CLUSTERS:
+        logger.warning(
+            "Identifier '%s' in threat payload is not a valid desert cluster. Sanitizing to 'cluster-desert-046'.",
+            raw_target,
+        )
+        target = "cluster-desert-046"
+    else:
+        target = raw_target
+
+    threat["device_id"] = target
+    threat["cluster_id"] = target
+    threat["sensor_cluster_id"] = target
+    return threat
 
 
 def create_preprovisioned_slice(
@@ -95,9 +126,13 @@ def create_preprovisioned_slice(
     return None
 
 
-def process_threats(threats: list[dict]):
+def process_threats(threats: List[Dict[str, Any]]):
+    sanitized_threats = [
+        sanitize_threat_payload(t) for t in threats if isinstance(t, dict)
+    ]
+
     actionable_requests = [
-        t for t in threats 
+        t for t in sanitized_threats 
         if t.get("severity_tier", 1) >= 2 or t.get("network_status", {}).get("network_degradation_detected", False)
     ]
 
@@ -160,9 +195,7 @@ def start_listener():
             threats = []
             for t in raw_threats:
                 if isinstance(t, dict):
-                    if not t.get("device_id"):
-                        t["device_id"] = t.get("sensor_cluster_id") or "cluster-desert-046"
-                    threats.append(t)
+                    threats.append(sanitize_threat_payload(t))
 
             if threats:
                 process_threats(threats)
