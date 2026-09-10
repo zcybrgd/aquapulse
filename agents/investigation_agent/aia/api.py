@@ -38,7 +38,7 @@ from aia.pipeline import AnomalyInvestigationAgent
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [aia.unified]: %(message)s")
 logger = logging.getLogger("aia.unified")
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6380/0")
 AQUAPULSE_PLATFORM_URL = os.environ.get(
     "AQUAPULSE_PLATFORM_URL",
     "http://127.0.0.1:8000/api/integrations/agents/investigation/v1/results",

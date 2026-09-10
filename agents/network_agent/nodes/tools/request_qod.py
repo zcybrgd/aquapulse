@@ -1,6 +1,5 @@
 import os
 import re
-import uuid
 import logging
 from typing import Dict, Any, Optional
 from langchain_core.tools import tool
@@ -13,35 +12,44 @@ logger = logging.getLogger("NMA.Tools.RequestQoD")
 
 DEFAULT_APP_SERVER_IPV4 = os.getenv("APP_SERVER_IPV4", "233.252.0.2")
 
-# Map cluster IDs to CAMARA test MSISDN numbers
-
-CLUSTER_MSISDN_MAP: dict[str, str] = {
+# Explicit mapping of physical asset device IDs and cluster IDs to Nokia CAMARA test MSISDNs
+DEVICE_MSISDN_MAP: dict[str, str] = {
+    # Physical Device Assets
+    "device-14-valve-A": "+99999991000",
+    # Telemetry Clusters
     "cluster-desert-042": "+99999991000",
     "cluster-desert-043": "+99999991001",
     "cluster-desert-044": "+99999991000",
     "cluster-desert-045": "+99999990404",
     "cluster-desert-046": "+99999991000",
 }
-DEFAULT_MSISDN = os.getenv("DEFAULT_DEVICE_MSISDN", "+99999991000")
+
+# Alias for backward compatibility
+CLUSTER_MSISDN_MAP = DEVICE_MSISDN_MAP
 
 
 def normalize_to_msisdn(device_or_cluster_id: str) -> str:
-    """Translates cluster/device identifiers into standard E.164 MSISDN format (+1234567890)."""
+    """Translates cluster/device identifiers into standard E.164 MSISDN format (+1234567890).
+    
+    Raises:
+        ValueError: If the identifier is unmapped and not a valid E.164 MSISDN.
+    """
     if not device_or_cluster_id:
-        return DEFAULT_MSISDN
+        raise ValueError("Device or cluster identifier cannot be empty.")
 
-    if device_or_cluster_id in CLUSTER_MSISDN_MAP:
-        return CLUSTER_MSISDN_MAP[device_or_cluster_id]
+    # 1. Direct lookup in device/cluster map
+    if device_or_cluster_id in DEVICE_MSISDN_MAP:
+        return DEVICE_MSISDN_MAP[device_or_cluster_id]
 
-    # Valid E.164 phone number check (+ followed by 10 to 15 digits)
+    # 2. Check if already a valid E.164 phone number (+ followed by 10 to 15 digits)
     if re.match(r"^\+\d{10,15}$", device_or_cluster_id):
         return device_or_cluster_id
 
-    logger.warning(
-        f"Identifier '{device_or_cluster_id}' is not a valid E.164 phone number. "
-        f"Mapping to default test MSISDN '{DEFAULT_MSISDN}'."
+    # 3. Fail fast without silent fallback defaults
+    raise ValueError(
+        f"Identifier '{device_or_cluster_id}' is neither a recognized asset/cluster ID "
+        f"nor a valid E.164 phone number. Please update DEVICE_MSISDN_MAP."
     )
-    return DEFAULT_MSISDN
 
 
 @tool
@@ -58,7 +66,7 @@ def request_qod(
     Polls the network gateway until allocation transitions from 'REQUESTED' to 'AVAILABLE'.
 
     Args:
-        device_id (string type): The phone number or identifier of the target device.
+        device_id (string type): The physical asset ID (e.g., 'device-14-valve-A'), cluster ID (e.g., 'cluster-desert-046'), or E.164 MSISDN.
         qos_profile (string type): The CAMARA QoS profile label ('QOS_E', 'QOS_L', 'QOS_M', 'QOS_S').
         app_server_ipv4 (string type): The IPv4 address of the application server.
         duration_seconds (integer type): Session length in seconds (up to 86400).
@@ -69,48 +77,14 @@ def request_qod(
     if not app_server_ipv4:
         app_server_ipv4 = DEFAULT_APP_SERVER_IPV4
 
-    # Guarantee device identifier is formatted as an E.164 MSISDN for CAMARA compatibility
+    # Resolve device identifier to E.164 MSISDN strictly
     msisdn = normalize_to_msisdn(device_id)
 
-    try:
-        res = camara_service.request_qod(
-            device_id=msisdn,
-            app_server_ipv4=app_server_ipv4,
-            qos_profile=qos_profile,
-            duration_seconds=duration_seconds,
-            wait_for_allocation=wait_for_allocation,
-            max_wait_seconds=max_wait_seconds
-        )
-
-        # Handle API status failures (400 Invalid phone number, 404, 500) gracefully for sandbox testing
-        if isinstance(res, dict) and res.get("status") == "FAILED":
-            error_str = str(res.get("error", ""))
-            logger.warning(
-                f"QoD endpoint returned error for device '{device_id}' (MSISDN: '{msisdn}'): {error_str}. "
-                "Falling back to mock successful allocation for sandbox execution."
-            )
-            return {
-                "status": "AVAILABLE",
-                "session_id": f"qod-sess-{uuid.uuid4().hex[:8]}",
-                "device_id": device_id,
-                "qos_profile": qos_profile,
-                "app_server_ipv4": app_server_ipv4,
-                "duration_seconds": duration_seconds,
-                "mocked": True,
-                "info": f"Mocked allocation due to API failure: {error_str}"
-            }
-
-        return res
-
-    except Exception as e:
-        logger.error(f"Error invoking camara_service.request_qod for '{device_id}': {e}. Falling back to mock session.")
-        return {
-            "status": "AVAILABLE",
-            "session_id": f"qod-sess-{uuid.uuid4().hex[:8]}",
-            "device_id": device_id,
-            "qos_profile": qos_profile,
-            "app_server_ipv4": app_server_ipv4,
-            "duration_seconds": duration_seconds,
-            "mocked": True,
-            "info": f"Mocked allocation due to exception: {e}"
-        }
+    return camara_service.request_qod(
+        device_id=msisdn,
+        app_server_ipv4=app_server_ipv4,
+        qos_profile=qos_profile,
+        duration_seconds=duration_seconds,
+        wait_for_allocation=wait_for_allocation,
+        max_wait_seconds=max_wait_seconds
+    )

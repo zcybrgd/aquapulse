@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelna
 logger = logging.getLogger("NMA.Runner")
 
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6380))
 REDIS_CHANNEL = "aia:results"
 
 url = os.getenv("WEBHOOK_URL", "https://example.com")
@@ -161,7 +161,7 @@ def start_listener():
             for t in raw_threats:
                 if isinstance(t, dict):
                     if not t.get("device_id"):
-                        t["device_id"] = t.get("sensor_cluster_id") or "device-14-valve-A"
+                        t["device_id"] = t.get("sensor_cluster_id") or "cluster-desert-046"
                     threats.append(t)
 
             if threats:
