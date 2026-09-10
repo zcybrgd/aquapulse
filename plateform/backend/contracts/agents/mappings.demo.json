@@ -1,0 +1,173 @@
+[
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-042",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-HBR-007",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Harbour sensor SNS-HBR-007"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "segment",
+    "external_id": "seg-neom-north-01",
+    "internal_entity_type": "segment",
+    "internal_public_id": "HBR-XFER-7",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed segment → Harbour Transfer Main · Segment 7"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-north-01",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-HBR-007",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Harbour isolation valve VLV-HBR-007"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-043",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-AIN-221",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Al Ain sensor SNS-AIN-221"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "segment",
+    "external_id": "seg-neom-north-02",
+    "internal_entity_type": "segment",
+    "internal_public_id": "AIN-FEED-3",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed segment → Al Ain Feeder 3"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-north-02",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-AIN-018",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Al Ain valve VLV-AIN-018"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-044",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-CRN-014",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Corniche sensor SNS-CRN-014"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "segment",
+    "external_id": "seg-neom-north-03",
+    "internal_entity_type": "segment",
+    "internal_public_id": "CRN-TRUNK-4.2",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed segment → Corniche Trunk Main"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-north-03",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-CRN-014",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Corniche valve VLV-CRN-014"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-045",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-DOH-044",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Doha sensor SNS-DOH-044"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "segment",
+    "external_id": "seg-neom-east-01",
+    "internal_entity_type": "segment",
+    "internal_public_id": "DOH-LUS-2",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed segment → Lusail Distributor 2"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-east-01",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-DOH-044",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Doha valve VLV-DOH-044"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-046",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-JED-112",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Jeddah sensor SNS-JED-112"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "segment",
+    "external_id": "seg-neom-west-01",
+    "internal_entity_type": "segment",
+    "internal_public_id": "JED-OBHUR-12",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed segment → Obhur Feeder · Node 12"}
+  },
+  {
+    "provider": "investigation_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-west-01",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-JED-112",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Jeddah valve VLV-JED-112"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "sensor_cluster",
+    "external_id": "cluster-desert-042",
+    "internal_entity_type": "sensor",
+    "internal_public_id": "SNS-HBR-007",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed cluster → Harbour sensor SNS-HBR-007"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "device",
+    "external_id": "valve-neom-north-01",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-HBR-007",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Harbour isolation valve VLV-HBR-007"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "valve",
+    "external_id": "valve-neom-north-01",
+    "internal_entity_type": "valve",
+    "internal_public_id": "VLV-HBR-007",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Testbed valve → Harbour isolation valve VLV-HBR-007"}
+  },
+  {
+    "provider": "response_agent",
+    "entity_type": "incident",
+    "external_id": "INC-1835",
+    "internal_entity_type": "incident",
+    "internal_public_id": "INC-1835",
+    "enabled": true,
+    "metadata": {"demo": true, "note": "Harbour confirmed leak incident"}
+  }
+]

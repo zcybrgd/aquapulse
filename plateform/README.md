@@ -902,7 +902,7 @@ Routes depend on `DeviceNetworkProvider`:
 
 Nokia/RapidAPI details stay in the HTTP adapter, not in FastAPI routes.
 
-#### Environment
+**Environment**
 
 ```text
 NOKIA_NETWORK_API_ENABLED=false
@@ -910,11 +910,15 @@ NOKIA_NETWORK_API_MODE=mock
 NOKIA_NETWORK_API_BASE_URL=
 NOKIA_NETWORK_API_KEY=
 NOKIA_NETWORK_API_HOST=
-NOKIA_LOCATION_PATH=/location-retrieval/v0.3/retrieve
-NOKIA_REACHABILITY_PATH=/device-reachability-status/v0.7/retrieve
+NOKIA_LOCATION_PATH=/location-retrieval/v0/retrieve
+NOKIA_REACHABILITY_PATH=/device-status/device-reachability-status/v1/retrieve
 NOKIA_NETWORK_TIMEOUT_SECONDS=10
 NOKIA_NETWORK_CACHE_SECONDS=300
 ```
+
+The backend also accepts `RAPIDAPI_KEY` / `RAPIDAPI_HOST` from the repo-root `.env` when `NOKIA_NETWORK_API_KEY` is unset. `./run.sh` turns Network Health to `live` when that RapidAPI key is present. That is **not** `CAMARA_ENABLED` (actuation stays off).
+
+`NOKIA_NETWORK_API_HOST` is the RapidAPI API id (`X-RapidAPI-Host`). The connection URL is `NOKIA_NETWORK_API_BASE_URL` (Nokia's RapidAPI gateway). If the host in `.env` does not resolve as DNS, the backend still sends it as the header and connects to `https://network-as-code.p-eu.rapidapi.com`.
 
 Modes:
 
@@ -922,6 +926,8 @@ Modes:
 - `simulator` → `source_mode: nokia_simulator`
 - `live` with a trusted base URL and key → `source_mode: nokia_live`
 - `disabled` → no external lookup (`not_checked`)
+
+Live calls use Nokia RapidAPI sandbox MSISDNs (`+99999991xxx`). AquaPulse asset SIMs are mapped at the HTTP adapter; the browser never sees raw numbers.
 
 Remote URLs come only from this trusted configuration. Requests use explicit timeouts and a bounded retry for safe retrieval only. Tests must not call the internet.
 

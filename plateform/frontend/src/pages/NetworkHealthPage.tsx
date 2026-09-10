@@ -69,12 +69,16 @@ export function NetworkHealthPage() {
   const lastRefresh = summary?.last_refresh_at ?? devices?.last_refresh_at ?? null;
   const networkConnected =
     summary?.source_mode === "nokia_live" || summary?.source_mode === "nokia_simulator";
+  const hasDevices = Boolean(devices?.items.length);
+  const showDeviceList = networkConnected || hasDevices;
   const selectedZone =
-    (summary?.available_zones ?? []).find(
-      (zone) =>
-        zone.toLowerCase() === filters.zone.toLowerCase() ||
-        zone.toLowerCase().includes(filters.zone.trim().toLowerCase()),
-    ) ?? filters.zone;
+    filters.zone.trim() === ""
+      ? ""
+      : ((summary?.available_zones ?? []).find(
+          (zone) =>
+            zone.toLowerCase() === filters.zone.toLowerCase() ||
+            zone.toLowerCase().includes(filters.zone.trim().toLowerCase()),
+        ) ?? filters.zone);
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-6 overflow-x-hidden">
@@ -197,14 +201,27 @@ export function NetworkHealthPage() {
 
       {loading ? <Skeleton className="h-32 w-full" /> : null}
       {!loading && error ? <ErrorState title="Unable to load network health" message={error} onRetry={() => void refreshAll()} /> : null}
-      {!loading && !error && summary && !networkConnected ? (
+      {networkConnected ? (
+        <p className="text-sm text-ink-muted">
+          Nokia Network as Code is connected. Refresh pulls live reachability and network-derived
+          location. This does not authorize valve commands.
+        </p>
+      ) : null}
+
+      {!loading && !error && summary && !networkConnected && !hasDevices ? (
         <EmptyState
           title="Network data source not connected"
           description="Nokia/CAMARA APIs are disabled. Device reachability and network-derived location stay unavailable until a trusted source is connected."
         />
       ) : null}
+      {!loading && !error && summary && !networkConnected && hasDevices ? (
+        <p className="text-sm text-ink-muted">
+          Showing stored snapshots. Connect Nokia/CAMARA and refresh to replace demonstration data
+          with live reachability.
+        </p>
+      ) : null}
 
-      {summary && networkConnected ? (
+      {summary && showDeviceList ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {[
             ["Cellular devices", summary.cellular_devices],
@@ -222,11 +239,11 @@ export function NetworkHealthPage() {
         </div>
       ) : null}
 
-      {networkConnected && !loading && devices && devices.items.length === 0 ? (
+      {showDeviceList && !loading && devices && devices.items.length === 0 ? (
         <EmptyState title="No devices match" description="No AquaPulse devices match these network filters." />
       ) : null}
 
-      {networkConnected && devices && devices.items.length > 0 ? (
+      {showDeviceList && devices && devices.items.length > 0 ? (
         <>
           <div className="grid grid-cols-1 gap-3 md:hidden">
             {devices.items.map((item) => (

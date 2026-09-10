@@ -533,7 +533,7 @@ export function mappingRows(
         externalId: finding.segmentId,
         mappedId: finding.mappedSegmentId,
         mapped: Boolean(finding.mappedSegmentId),
-        href: finding.mappedSegmentId ? `/assets/${encodeURIComponent(finding.mappedSegmentId)}` : null,
+        href: null,
       });
     }
     if (finding.valveId) {

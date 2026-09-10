@@ -276,6 +276,34 @@ fi
 log "Python: $(python --version)"
 log "Environment: $VIRTUAL_ENV"
 
+# Nokia Network as Code for Network Health (reachability / location only).
+# This is not CAMARA_ENABLED — actuation and valve commands stay off.
+configure_nokia_network_health() {
+    local root_env="$ROOT_DIR/.env"
+    if [[ ! -f "$root_env" ]]; then
+        log "Nokia/CAMARA Network Health: mock (no root .env)"
+        return 0
+    fi
+    if ROOT_ENV_FILE="$root_env" python - <<'PY'
+import os
+from dotenv import dotenv_values
+
+values = dotenv_values(os.environ["ROOT_ENV_FILE"])
+key = (values.get("RAPIDAPI_KEY") or values.get("NOKIA_NETWORK_API_KEY") or "").strip().strip('"').strip("'")
+raise SystemExit(0 if key else 1)
+PY
+    then
+        export NOKIA_NETWORK_API_ENABLED="${NOKIA_NETWORK_API_ENABLED:-true}"
+        export NOKIA_NETWORK_API_MODE="${NOKIA_NETWORK_API_MODE:-live}"
+        export NOKIA_NETWORK_API_HOST="${NOKIA_NETWORK_API_HOST:-network-as-code.nokia.rapidapi.com}"
+        export NOKIA_NETWORK_API_BASE_URL="${NOKIA_NETWORK_API_BASE_URL:-https://network-as-code.p-eu.rapidapi.com}"
+        log "Nokia/CAMARA Network Health: live (RapidAPI key present; actuation flags unchanged)"
+    else
+        log "Nokia/CAMARA Network Health: mock (no RapidAPI key)"
+    fi
+}
+configure_nokia_network_health
+
 # ----------------------------------------------------------------------------
 # 4. Python Dependencies
 # ----------------------------------------------------------------------------

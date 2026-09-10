@@ -108,7 +108,7 @@ def table_totals(session: Session) -> CleanupCounts:
         session.scalar(
             select(func.count())
             .select_from(IntegrationIdentityMapping)
-            .where(_demo_id_filters(IntegrationIdentityMapping.external_id, IntegrationIdentityMapping.internal_public_id))
+            .where(_demo_id_filters(IntegrationIdentityMapping.internal_public_id))
         )
         or 0
     )
@@ -204,10 +204,7 @@ def select_dummy_agent_data(session: Session) -> DummySelection:
     mapping_ids = list(
         session.scalars(
             select(IntegrationIdentityMapping.id).where(
-                _demo_id_filters(
-                    IntegrationIdentityMapping.external_id,
-                    IntegrationIdentityMapping.internal_public_id,
-                )
+                _demo_id_filters(IntegrationIdentityMapping.internal_public_id)
             )
         ).all()
     )

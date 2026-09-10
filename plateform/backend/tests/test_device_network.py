@@ -25,6 +25,7 @@ from app.network.providers import (
     HttpNokiaDeviceNetworkProvider,
     MockNokiaDeviceNetworkProvider,
     build_device_network_provider,
+    nokia_sandbox_phone_number,
 )
 from app.scripts.seed_database import seed_database
 from app.scripts.seed_device_network import SEED_SNAPSHOTS
@@ -104,7 +105,7 @@ def test_http_provider_mocked_transport_timeout_and_malformed() -> None:
     def success(request: httpx.Request) -> httpx.Response:
         assert request.headers["X-RapidAPI-Key"] == "test-key-not-real"
         body = json.loads(request.content)
-        assert body["device"]["phoneNumber"].startswith("+")
+        assert body["device"]["phoneNumber"] == "+99999991001"
         if "reachability" in str(request.url):
             return httpx.Response(200, json={"reachable": True, "connectivity": ["SMS"]})
         return httpx.Response(
@@ -156,11 +157,44 @@ def test_factory_defaults_to_mock_without_credentials() -> None:
         nokia_network_api_mode="live",
         nokia_network_api_base_url="",
         nokia_network_api_key="",
+        nokia_network_api_host="",
     )
     fallback = build_device_network_provider(live_without_key)
     assert isinstance(fallback, MockNokiaDeviceNetworkProvider)
     disabled = build_device_network_provider(Settings(nokia_network_api_mode="disabled"))
     assert isinstance(disabled, DisabledDeviceNetworkProvider)
+
+
+def test_nokia_sandbox_phone_number_mapping() -> None:
+    assert nokia_sandbox_phone_number("+971500004821") == "+99999991001"
+    assert nokia_sandbox_phone_number("+971500007007") == "+99999991003"
+    assert nokia_sandbox_phone_number("+99999991001") == "+99999991001"
+    assert nokia_sandbox_phone_number("+15551212") == "+99999991001"
+
+
+def test_settings_alias_rapidapi_without_enabling_live(monkeypatch) -> None:
+    monkeypatch.setenv("RAPIDAPI_KEY", "alias-key-not-real")
+    monkeypatch.setenv("RAPIDAPI_HOST", "network-as-code.nokia.rapidapi.com")
+    monkeypatch.delenv("NOKIA_NETWORK_API_KEY", raising=False)
+    monkeypatch.delenv("NOKIA_NETWORK_API_HOST", raising=False)
+    monkeypatch.delenv("NOKIA_NETWORK_API_BASE_URL", raising=False)
+    monkeypatch.setenv("NOKIA_NETWORK_API_ENABLED", "false")
+    monkeypatch.setenv("NOKIA_NETWORK_API_MODE", "mock")
+    settings = Settings()
+    assert settings.nokia_network_api_key == "alias-key-not-real"
+    assert settings.nokia_network_api_host == "network-as-code.nokia.rapidapi.com"
+    assert settings.nokia_network_api_base_url == "https://network-as-code.p-eu.rapidapi.com"
+    assert settings.nokia_network_api_enabled is False
+    assert settings.camara_enabled is False
+    assert isinstance(build_device_network_provider(settings), MockNokiaDeviceNetworkProvider)
+    remapped = Settings(
+        nokia_network_api_key="alias-key-not-real",
+        nokia_network_api_host="network-as-code.nokia.rapidapi.com",
+        nokia_network_api_base_url="https://network-as-code.nokia.rapidapi.com",
+        nokia_network_api_enabled=False,
+    )
+    assert remapped.nokia_network_api_host == "network-as-code.nokia.rapidapi.com"
+    assert remapped.nokia_network_api_base_url == "https://network-as-code.p-eu.rapidapi.com"
 
 
 def test_devices_with_and_without_msisdn(client, test_database) -> None:
