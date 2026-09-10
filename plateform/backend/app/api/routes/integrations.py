@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 
-from app.api.deps import get_integration_service
+from app.api.deps import get_agent_status_checker, get_integration_service
+from app.integrations.agent_status import AgentStatusChecker
 from app.integrations.contracts.investigation import AgentHealth
 from app.schemas.integrations import (
     AgentFindingRecord,
@@ -14,11 +15,21 @@ from app.schemas.integrations import (
     AgentRunSummary,
     AgentSummary,
     ContractMetadata,
+    IntegrationStatusResponse,
     ValidationResult,
 )
 from app.services.integrations import IntegrationService
 
 router = APIRouter(prefix="/integrations/agents", tags=["integrations"])
+status_router = APIRouter(prefix="/integrations", tags=["integrations"])
+
+
+@status_router.get("/status", response_model=IntegrationStatusResponse)
+async def get_integration_status(
+    refresh: bool = Query(default=False),
+    checker: AgentStatusChecker = Depends(get_agent_status_checker),
+) -> IntegrationStatusResponse:
+    return await checker.collect(refresh=refresh)
 
 
 @router.get("/readiness", response_model=AgentReadiness)

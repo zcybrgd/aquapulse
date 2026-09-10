@@ -101,6 +101,7 @@ class ResponseResultV1(BaseModel):
     human_override_requested: bool = False
     human_override_response: str | None = None
     reasoning_trace: list[Any] | dict[str, Any] = Field(default_factory=list)
+    data_mode: str | None = None
     created_at: datetime
     audit: ResponseAuditEntryV1 | None = None
     extensions: dict[str, Any] = Field(default_factory=dict)

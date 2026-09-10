@@ -5,7 +5,19 @@ import type {
   AgentRecommendationRecord,
   AgentRunDetail,
   IntegrationBundle,
+  IntegrationStatus,
 } from "../types/integrations";
+
+export async function fetchIntegrationStatus(options?: {
+  signal?: AbortSignal;
+  refresh?: boolean;
+}): Promise<IntegrationStatus> {
+  const { data } = await apiClient.get<IntegrationStatus>("/api/integrations/status", {
+    signal: options?.signal,
+    params: options?.refresh ? { refresh: true } : undefined,
+  });
+  return data;
+}
 
 export async function fetchAgentReadiness(options?: { signal?: AbortSignal }): Promise<AgentReadiness> {
   const { data } = await apiClient.get<AgentReadiness>("/api/integrations/agents/readiness", {
@@ -47,7 +59,9 @@ export async function fetchIntegrationBundle(options?: { signal?: AbortSignal })
 }
 
 export async function fetchAgentRun(runId: string, options?: { signal?: AbortSignal }): Promise<AgentRunDetail> {
-  const { data } = await apiClient.get<AgentRunDetail>(`/api/integrations/agents/runs/${runId}`, {
+  const { data } = await apiClient.get<AgentRunDetail>(
+    `/api/integrations/agents/runs/${encodeURIComponent(runId)}`,
+    {
     signal: options?.signal,
   });
   return data;

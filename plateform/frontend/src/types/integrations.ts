@@ -123,3 +123,35 @@ export interface IntegrationBundle {
   findings: AgentFindingRecord[];
   recommendations: AgentRecommendationRecord[];
 }
+
+export type AgentHealthStatus = "not_configured" | "checking" | "healthy" | "unavailable";
+export type AgentContractStatus = "unknown" | "compatible" | "incompatible" | "unavailable";
+export type AgentRuntimeType = "investigation_agent" | "network_management_agent" | "response_agent";
+export type AgentStatusErrorCode =
+  | "agent_not_configured"
+  | "agent_unreachable"
+  | "agent_health_timeout"
+  | "agent_health_invalid"
+  | "agent_contract_unavailable"
+  | "agent_contract_mismatch";
+
+export interface AgentRuntimeStatus {
+  agent_type: AgentRuntimeType;
+  display_name: string;
+  configured: boolean;
+  execution_enabled: boolean;
+  reachable: boolean;
+  health_status: AgentHealthStatus;
+  contract_status: AgentContractStatus;
+  contract_version: string | null;
+  checked_at: string;
+  response_time_ms: number | null;
+  error_code: AgentStatusErrorCode | null;
+  error_message: string | null;
+}
+
+export interface IntegrationStatus {
+  generated_at: string;
+  execution_globally_enabled: boolean;
+  agents: AgentRuntimeStatus[];
+}

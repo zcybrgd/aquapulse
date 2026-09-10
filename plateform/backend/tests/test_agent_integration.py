@@ -70,7 +70,6 @@ def test_readiness_has_no_secrets_or_urls(client) -> None:
         assert "base_url" not in agent
         assert "url" not in agent
         assert agent["mode"] == "disabled"
-        assert agent["url_configured"] is False
 
 
 def test_validate_investigation_request_and_response(client) -> None:

@@ -678,7 +678,7 @@ class IntegrationService:
             request_payload=redact_payload({"result_id": parsed.result_id}),
             response_payload=redact_payload(parsed.model_dump(mode="json")),
             started_at=started,
-            data_mode="simulated",
+            data_mode=(parsed.data_mode or "").strip() or "simulated",
         )
         self.repository.add_run(run)
         self.session.flush()

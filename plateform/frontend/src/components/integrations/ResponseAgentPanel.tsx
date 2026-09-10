@@ -26,8 +26,8 @@ export function ResponseAgentPanel({
       {!loading && !error && items.length === 0 ? (
         <div className="mt-3">
           <EmptyState
-            title="No Response Agent recommendation available"
-            description="Waiting for integration. A recommendation appears after a validated Response Agent POST."
+            title="No Response Agent recommendations available."
+            description="Recommendations appear after an external Response Agent posts a validated result."
           />
         </div>
       ) : null}

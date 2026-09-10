@@ -132,7 +132,7 @@ export function AgentAuditPage() {
       {loading ? <Skeleton className="h-40 w-full" /> : null}
       {!loading && error ? <ErrorState title="Unable to load agent audit" message={error} onRetry={reload} /> : null}
 
-      {summary ? (
+      {summary && items.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <Card className="min-w-0 p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total runs</p>
@@ -167,8 +167,8 @@ export function AgentAuditPage() {
 
       {!loading && items.length === 0 ? (
         <EmptyState
-          title="Waiting for integration"
-          description="No Investigation Agent or Response Agent runs have been ingested."
+          title="No agent runs yet"
+          description="Runs will appear after an external agent is connected and executed."
         />
       ) : null}
 

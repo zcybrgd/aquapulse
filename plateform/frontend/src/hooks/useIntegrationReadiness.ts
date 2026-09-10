@@ -10,6 +10,8 @@ export function useIntegrationReadiness() {
   const [error, setError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const requestId = useRef(0);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
   const reload = useCallback(() => {
     setRefreshNonce((value) => value + 1);
@@ -19,7 +21,7 @@ export function useIntegrationReadiness() {
     const controller = new AbortController();
     const current = requestId.current + 1;
     requestId.current = current;
-    setLoading(true);
+    if (!dataRef.current) setLoading(true);
 
     void fetchIntegrationBundle({ signal: controller.signal })
       .then((bundle) => {
@@ -30,7 +32,7 @@ export function useIntegrationReadiness() {
       .catch((caught: unknown) => {
         if (isAxiosError(caught) && caught.code === "ERR_CANCELED") return;
         if (requestId.current !== current) return;
-        setError("Integration readiness could not be loaded.");
+        if (!dataRef.current) setError("Integration readiness could not be loaded.");
       })
       .finally(() => {
         if (requestId.current === current) setLoading(false);

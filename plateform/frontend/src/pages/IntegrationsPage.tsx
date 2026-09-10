@@ -1,63 +1,31 @@
 import { Link } from "react-router-dom";
 import { RefreshCw, ShieldAlert } from "lucide-react";
 
+import { AgentStatusCard } from "../components/integrations/AgentStatusCard";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { Skeleton } from "../components/ui/Skeleton";
-import { StatusDot } from "../components/ui/StatusDot";
 import { useIntegrationReadiness } from "../hooks/useIntegrationReadiness";
-import { formatDateTime } from "../lib/format";
-import type { AgentSummary } from "../types/integrations";
-
-function AgentCard({ agent }: { agent: AgentSummary }) {
-  return (
-    <Card className="min-w-0 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold text-ink">{agent.display_name}</h3>
-          <p className="mt-1 text-sm text-ink-muted">{agent.agent_code}</p>
-        </div>
-        <StatusDot
-          tone={agent.health_status === "healthy" ? "success" : "warning"}
-          label={agent.health_status}
-        />
-      </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <dt className="text-ink-muted">Mode</dt>
-          <dd className="font-medium text-ink">{agent.mode}</dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Contract</dt>
-          <dd className="font-medium text-ink">
-            {agent.agent_code === "network_management_agent" ||
-            agent.agent_code === "network_agent" ||
-            agent.contract_version === "unconfirmed" ||
-            agent.contract_version === "draft-unconfirmed"
-              ? "Contract awaiting team confirmation"
-              : agent.contract_version}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">URL configured</dt>
-          <dd className="font-medium text-ink">{agent.url_configured ? "Yes" : "No"}</dd>
-        </div>
-        <div>
-          <dt className="text-ink-muted">Last health check</dt>
-          <dd className="font-medium text-ink">
-            {agent.last_health_check_at ? formatDateTime(agent.last_health_check_at) : "Never"}
-          </dd>
-        </div>
-      </dl>
-    </Card>
-  );
-}
+import { useIntegrationStatus } from "../hooks/useIntegrationStatus";
 
 export function IntegrationsPage() {
   const { data, loading, error, reload } = useIntegrationReadiness();
+  const {
+    data: status,
+    loading: statusLoading,
+    refreshing: statusRefreshing,
+    error: statusError,
+    reload: reloadStatus,
+  } = useIntegrationStatus();
   const readiness = data?.readiness;
+  const pageBusy = (loading && !data) || (statusLoading && !status);
+
+  const refreshAll = () => {
+    reload();
+    reloadStatus();
+  };
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-[1400px] flex-col gap-6 overflow-x-hidden">
@@ -65,18 +33,41 @@ export function IntegrationsPage() {
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">Integration Readiness</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            Contracts, mappings and safety gates for later agent connection. This page is read-only
+            Live health and contract checks for connected agent services. This page is read-only
             and cannot enable integrations.
           </p>
         </div>
-        <Button variant="secondary" onClick={reload} disabled={loading}>
+        <Button variant="secondary" onClick={refreshAll} disabled={pageBusy || statusRefreshing}>
           <RefreshCw size={14} aria-hidden="true" />
           Refresh
         </Button>
       </div>
 
-      {loading ? <Skeleton className="h-40 w-full" /> : null}
-      {!loading && error ? <ErrorState message={error} onRetry={reload} /> : null}
+      {pageBusy ? <Skeleton className="h-40 w-full" /> : null}
+      {!pageBusy && statusError && !status ? <ErrorState message={statusError} onRetry={reloadStatus} /> : null}
+      {!pageBusy && !statusError && error && !readiness ? <ErrorState message={error} onRetry={reload} /> : null}
+
+      {status && !status.execution_globally_enabled ? (
+        <Card className="border-warning/40 bg-warning/10 p-5">
+          <p className="text-sm font-semibold text-ink">
+            Agent services may be connected for readiness checks, but AquaPulse agent execution
+            remains disabled.
+          </p>
+        </Card>
+      ) : null}
+
+      {status ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {status.agents.map((agent) => (
+            <AgentStatusCard
+              key={agent.agent_type}
+              agent={agent}
+              checking={statusRefreshing}
+              onCheckAgain={reloadStatus}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {readiness ? (
         <>
@@ -108,12 +99,6 @@ export function IntegrationsPage() {
                 {readiness.safety.physical_commands_enabled ? "Enabled" : "Disabled"}
               </p>
             </Card>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {readiness.agents.map((agent) => (
-              <AgentCard key={agent.agent_code} agent={agent} />
-            ))}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -155,7 +140,10 @@ export function IntegrationsPage() {
               <h3 className="text-base font-semibold text-ink">Last runs</h3>
             </div>
             {readiness.last_runs.length === 0 ? (
-              <EmptyState title="No agent runs" description="Runs appear after a validated result is stored." />
+              <EmptyState
+                title="No agent runs yet"
+                description="Runs will appear after an external agent is connected and executed."
+              />
             ) : (
               <ul className="divide-y divide-line">
                 {readiness.last_runs.map((run) => (
@@ -182,7 +170,10 @@ export function IntegrationsPage() {
                 <p className="mt-1 text-sm text-ink-muted">Agent result is advisory</p>
               </div>
               {(data?.findings.length ?? 0) === 0 ? (
-                <EmptyState title="No findings" description="Investigation results stay here as evidence only." />
+                <EmptyState
+                  title="No Investigation Agent findings available."
+                  description="Findings appear after an external Investigation Agent posts a validated result."
+                />
               ) : (
                 <ul className="divide-y divide-line">
                   {data?.findings.map((finding) => (
@@ -208,8 +199,8 @@ export function IntegrationsPage() {
               </div>
               {(data?.recommendations.length ?? 0) === 0 ? (
                 <EmptyState
-                  title="No Response Agent recommendation available"
-                  description="Waiting for integration. Recommendations appear after a validated Response Agent POST."
+                  title="No Response Agent recommendations available."
+                  description="Recommendations appear after an external Response Agent posts a validated result."
                 />
               ) : (
                 <ul className="divide-y divide-line">

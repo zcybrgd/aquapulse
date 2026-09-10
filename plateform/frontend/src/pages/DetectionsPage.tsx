@@ -77,8 +77,8 @@ export function DetectionsPage() {
         findings.items.length === 0 ? (
           <div className="card">
             <EmptyState
-              title="Awaiting Investigation Agent result"
-              description="Waiting for integration. Findings appear after the Investigation Agent POSTs a validated batch."
+              title="No Investigation Agent findings available."
+              description="Findings appear after an external Investigation Agent posts a validated result."
             />
           </div>
         ) : (

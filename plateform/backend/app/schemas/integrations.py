@@ -46,6 +46,44 @@ class AgentRunSummary(BaseModel):
     error_code: str | None = None
 
 
+AgentHealthStatus = Literal["not_configured", "checking", "healthy", "unavailable"]
+AgentContractStatus = Literal["unknown", "compatible", "incompatible", "unavailable"]
+AgentRuntimeType = Literal["investigation_agent", "network_management_agent", "response_agent"]
+AgentErrorCode = Literal[
+    "agent_not_configured",
+    "agent_unreachable",
+    "agent_health_timeout",
+    "agent_health_invalid",
+    "agent_contract_unavailable",
+    "agent_contract_mismatch",
+]
+
+
+class AgentRuntimeStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent_type: AgentRuntimeType
+    display_name: str
+    configured: bool
+    execution_enabled: bool
+    reachable: bool
+    health_status: AgentHealthStatus
+    contract_status: AgentContractStatus
+    contract_version: str | None = None
+    checked_at: datetime
+    response_time_ms: int | None = None
+    error_code: AgentErrorCode | None = None
+    error_message: str | None = None
+
+
+class IntegrationStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generated_at: datetime
+    execution_globally_enabled: bool
+    agents: list[AgentRuntimeStatus]
+
+
 class AgentReadiness(BaseModel):
     prepared: bool = True
     execution_enabled: bool = False

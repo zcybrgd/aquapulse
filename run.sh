@@ -34,6 +34,21 @@ TESTBED_DASHBOARD_PORT=8080
 AGENT_PORT=8002
 FRONTEND_PORT=5173
 
+# Host-local defaults for readiness probes. 127.0.0.1 is this process/container.
+# If AquaPulse runs in Docker and agents are on the host or another service,
+# set the URLs explicitly (Compose service name or host.docker.internal).
+# Do not overwrite values already supplied by the operator.
+INVESTIGATION_AGENT_PORT="${INVESTIGATION_AGENT_PORT:-${AGENT_PORT}}"
+export INVESTIGATION_AGENT_URL="${INVESTIGATION_AGENT_URL:-http://127.0.0.1:${INVESTIGATION_AGENT_PORT:-8002}}"
+export NETWORK_AGENT_URL="${NETWORK_AGENT_URL:-http://127.0.0.1:${NETWORK_AGENT_PORT:-9001}}"
+export RESPONSE_AGENT_URL="${RESPONSE_AGENT_URL:-http://127.0.0.1:${NETWORK_RELEASE_PORT:-8004}}"
+export AGENT_INTEGRATION_ENABLED="${AGENT_INTEGRATION_ENABLED:-false}"
+export INVESTIGATION_AGENT_ENABLED="${INVESTIGATION_AGENT_ENABLED:-false}"
+export NETWORK_AGENT_ENABLED="${NETWORK_AGENT_ENABLED:-false}"
+export RESPONSE_AGENT_ENABLED="${RESPONSE_AGENT_ENABLED:-false}"
+export AGENT_HEALTH_TIMEOUT_SECONDS="${AGENT_HEALTH_TIMEOUT_SECONDS:-2}"
+export AGENT_HEALTH_CACHE_SECONDS="${AGENT_HEALTH_CACHE_SECONDS:-15}"
+
 INSTALL_DEPS=true
 
 # ----------------------------------------------------------------------------
@@ -122,6 +137,8 @@ Services:
     Platform Backend    http://localhost:${BACKEND_PORT}
     Testbed Dashboard   http://localhost:${TESTBED_DASHBOARD_PORT}
     AIA Agent API       http://localhost:${AGENT_PORT}
+    Network Agent       http://localhost:${NETWORK_AGENT_PORT}
+    Response Agent      http://localhost:${NETWORK_RELEASE_PORT}
     Platform Frontend   http://localhost:${FRONTEND_PORT}
 
 Docker:
@@ -410,8 +427,11 @@ ${GREEN}Testbed Dashboard:${RESET}
 ${GREEN}AIA Investigation Agent:${RESET}
     http://localhost:${AGENT_PORT}
 
-${GREEN}Network Agent Release Server:${RESET}
-    http://localhost:${NETWORK_RELEASE_PORT}
+${GREEN}Network Agent:${RESET}
+    ${NETWORK_AGENT_URL}
+
+${GREEN}Response Agent / Network Release Server:${RESET}
+    ${RESPONSE_AGENT_URL}
 
 ${GREEN}Platform Frontend:${RESET}
     http://localhost:${FRONTEND_PORT}

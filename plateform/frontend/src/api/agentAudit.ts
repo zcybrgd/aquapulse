@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { mapAgentAuditRunDetail } from "../lib/agentAudit";
 import type {
   AgentAuditEventDetail,
   AgentAuditFilters,
@@ -6,6 +6,7 @@ import type {
   AgentAuditRunListResponse,
   AgentAuditSummary,
 } from "../types/agentAudit";
+import { apiClient } from "./client";
 
 function toQuery(filters: AgentAuditFilters): Record<string, string> {
   const query: Record<string, string> = {};
@@ -41,11 +42,14 @@ export async function fetchAgentAuditRuns(
   return data;
 }
 
-export async function fetchAgentAuditRun(runId: string): Promise<AgentAuditRunDetail> {
-  const { data } = await apiClient.get<AgentAuditRunDetail>(
-    `/api/agent-audit/runs/${encodeURIComponent(runId)}`,
-  );
-  return data;
+export async function fetchAgentAuditRun(
+  runId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AgentAuditRunDetail> {
+  const { data } = await apiClient.get<unknown>(`/api/agent-audit/runs/${encodeURIComponent(runId)}`, {
+    signal: options?.signal,
+  });
+  return mapAgentAuditRunDetail(data);
 }
 
 export async function fetchAgentAuditEvent(eventId: string): Promise<AgentAuditEventDetail> {

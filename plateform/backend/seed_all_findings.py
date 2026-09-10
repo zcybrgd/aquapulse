@@ -1,3 +1,5 @@
+"""Manual one-off helper. Not part of normal seed and must not run automatically."""
+
 import json
 import urllib.request
 from datetime import datetime, timezone

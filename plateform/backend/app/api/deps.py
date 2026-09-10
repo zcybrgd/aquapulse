@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.integrations.agent_status import AgentStatusChecker, get_agent_status_checker as _get_agent_status_checker
 from app.network.providers import build_device_network_provider
 from app.services.assets import AssetService
 from app.services.detections import DetectionService
@@ -76,3 +77,7 @@ def get_network_health_service(
 
 def get_agent_audit_service(db: Session = Depends(get_db)) -> AgentAuditService:
     return AgentAuditService(db)
+
+
+def get_agent_status_checker() -> AgentStatusChecker:
+    return _get_agent_status_checker()

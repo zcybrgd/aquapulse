@@ -8,6 +8,20 @@ export interface AgentAuditFilters {
   search: string;
 }
 
+export type AgentAuditRunStatus =
+  | "pending"
+  | "validating"
+  | "ready"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "rejected"
+  | "cancelled";
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonObject = { [key: string]: JsonValue };
+export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
+
 export interface AgentCount {
   key: string;
   count: number;
@@ -54,10 +68,10 @@ export interface AgentAuditEventSummary {
 }
 
 export interface AgentAuditEventDetail extends AgentAuditEventSummary {
-  input_summary: Record<string, unknown>;
-  output_summary: Record<string, unknown>;
-  reasoning_trace: unknown;
-  safety_checks: unknown;
+  input_summary: JsonObject;
+  output_summary: JsonObject;
+  reasoning_trace: JsonValue;
+  safety_checks: JsonValue;
 }
 
 export interface LinkedFinding {

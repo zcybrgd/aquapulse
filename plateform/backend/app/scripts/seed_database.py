@@ -24,6 +24,7 @@ from app.db.models import (
     Zone,
 )
 from app.db.models.maintenance import MaintenancePlan, MaintenanceWorkOrder
+from app.core.config import get_settings
 from app.db.session import get_session_factory
 from app.schemas.incidents import IncidentDetail
 from app.scripts.seed_integrations import seed_integrations
@@ -439,6 +440,8 @@ def seed_database(session: Session | None = None) -> SeedSummary:
         seed_operations_demo(db)
         seed_integrations(db)
         seed_maintenance_demo(db)
+        if get_settings().seed_agent_demo_data:
+            print("SEED_AGENT_DEMO_DATA is set but dummy agent operational seeding is disabled.")
         network_audit = seed_network_audit(db)
         device_network = seed_device_network(db)
 
