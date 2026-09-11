@@ -22,7 +22,7 @@ _shared_rate_limiter = InMemoryRateLimiter(
 def get_groq_llm(
     model: Optional[str] = None,
     temperature: float = 0.0,
-    max_retries: int = 5,
+    max_retries: int = 2,
     requests_per_second: Optional[float] = None,
 ) -> ChatGroq:
     """
@@ -54,9 +54,10 @@ def get_groq_llm(
     logger.debug("Initializing ChatGroq instance model=%s temperature=%.2f", resolved_model, temperature)
 
     return ChatGroq(
-        model=resolved_model,
-        temperature=temperature,
-        api_key=api_key,
-        max_retries=max_retries,
-        rate_limiter=rate_limiter,
-    )
+    model=resolved_model,
+    temperature=temperature,
+    max_tokens=int(os.getenv("GROQ_MAX_OUTPUT_TOKENS", "1000")),
+    api_key=api_key,
+    max_retries=min(max_retries, 2),
+    rate_limiter=rate_limiter,
+)

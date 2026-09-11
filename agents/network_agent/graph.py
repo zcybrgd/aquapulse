@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Annotated, Sequence, TypedDict, List, Dict, Any
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
@@ -8,6 +9,8 @@ from agents.network_agent.nodes.collect_requests import RequestCollector
 from agents.network_agent.nodes.rank_requests import rank_requests
 from agents.network_agent.nodes.group_requests import group_requests_by_zone
 from agents.network_agent.nodes.dispatch_to_response import dispatch_node
+
+logger = logging.getLogger("network_agent.graph")
 
 VALID_DESERT_CLUSTERS = {
     "cluster-desert-042",
@@ -59,6 +62,11 @@ def rank_node(state: NetworkWorkflowState) -> Dict[str, Any]:
 def group_node(state: NetworkWorkflowState) -> Dict[str, Any]:
     ranked_reqs = state.get("ranked_requests", [])
     grouped_batches = group_requests_by_zone(ranked_reqs)
+    logger.info(
+        "group_requests_complete requests=%d zones=%d",
+        len(ranked_reqs),
+        len(grouped_batches),
+    )
     
     prompt_text = (
         "Process the following network resource requests grouped by regional zone:\n"
@@ -77,8 +85,31 @@ network_agent_runner = NetworkAgent()
 
 
 def agent_node(state: NetworkWorkflowState) -> Dict[str, Any]:
+    logger.info("network_policy_start messages=%d", len(state.get("messages", [])))
     agent_output = network_agent_runner.agent.invoke({"messages": state["messages"]})
-    return {"messages": agent_output["messages"]}
+    output_messages = agent_output.get("messages", [])
+    response = output_messages[-1]
+    response_metadata = getattr(response, "response_metadata", {}) or {}
+    logger.info(
+        "network_model_response type=%s tool_calls=%s finish_reason=%s",
+        type(response).__name__,
+        getattr(response, "tool_calls", None),
+        response_metadata.get("finish_reason"),
+    )
+    logger.info(
+        "network_message_trace %s",
+        [
+            {
+                "index": index,
+                "type": type(message).__name__,
+                "name": getattr(message, "name", None),
+                "tool_calls": [call.get("name") for call in (getattr(message, "tool_calls", None) or [])],
+            }
+            for index, message in enumerate(output_messages)
+        ],
+    )
+    logger.info("network_policy_complete messages=%d", len(output_messages))
+    return {"messages": output_messages}
 
 
 workflow = StateGraph(NetworkWorkflowState)

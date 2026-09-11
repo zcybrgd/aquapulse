@@ -7,6 +7,36 @@ from agents.network_agent.camara_api import camara_service
 
 load_dotenv()
 
+CLUSTER_MSISDN_MAP: dict[str, str] = {
+    "cluster-desert-042": "+99999991000",
+    "cluster-desert-043": "+99999991001",
+    "cluster-desert-044": "+99999991000",
+    "cluster-desert-045": "+99999990404",
+    "cluster-desert-046": "+99999991000",
+}
+
+
+def normalize_device(dev: Dict[str, Any], idx: int) -> tuple[str, int]:
+    device_identifier = dev.get("phone_number") or dev.get("device_id")
+    if not device_identifier:
+        raise ValueError("Each slicing device must include phone_number or device_id.")
+
+    phone_number = CLUSTER_MSISDN_MAP.get(device_identifier, device_identifier)
+    raw_imsi = dev.get("imsi")
+
+    if raw_imsi is None or raw_imsi == device_identifier or raw_imsi in CLUSTER_MSISDN_MAP:
+        imsi_val = 99999991000 + idx
+    else:
+        try:
+            imsi_val = int(raw_imsi)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid IMSI for device '{device_identifier}': expected a numeric IMSI, got {raw_imsi!r}."
+            ) from exc
+
+    return phone_number, imsi_val
+
+
 @tool
 def request_network_slice(
     devices: List[Dict[str, Any]], 
@@ -25,9 +55,7 @@ def request_network_slice(
     print(f"\n[Request Slicing Tool] Attaching {len(devices)} device(s) individually to slice '{active_slice_id}'...")
 
     for idx, dev in enumerate(devices):
-        phone_number = dev.get("phone_number") or dev.get("device_id")
-        raw_imsi = dev.get("imsi")
-        imsi_val = int(raw_imsi) if raw_imsi is not None else (99999991000 + idx)
+        phone_number, imsi_val = normalize_device(dev, idx)
         
         device_payload = {
             "phone_number": phone_number,

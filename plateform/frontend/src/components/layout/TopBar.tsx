@@ -39,10 +39,6 @@ export function TopBar({ title, onOpenSidebar }: TopBarProps) {
         ))}
       </select>
 
-      <div className="hidden items-center rounded-xl border border-line bg-page px-3 py-2 md:flex">
-        <StatusDot label="Waiting for integration" />
-      </div>
-
       <button
         type="button"
         className="relative rounded-xl p-2 text-ink-muted hover:bg-page hover:text-ink"

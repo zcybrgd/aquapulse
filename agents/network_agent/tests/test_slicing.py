@@ -3,7 +3,27 @@ import time
 import json
 import secrets
 from dotenv import load_dotenv
-from agents.network_agent.nodes.tools.request_slicing import request_network_slice
+import pytest
+
+from agents.network_agent.nodes.tools.request_slicing import normalize_device, request_network_slice
+
+
+def test_normalize_device_maps_cluster_alias_and_uses_numeric_fallback_imsi():
+    phone_number, imsi = normalize_device(
+        {"phone_number": "cluster-desert-044", "imsi": "cluster-desert-044"},
+        idx=0,
+    )
+
+    assert phone_number == "+99999991000"
+    assert imsi == 99999991000
+
+
+def test_normalize_device_rejects_unrelated_non_numeric_imsi():
+    with pytest.raises(ValueError, match="expected a numeric IMSI"):
+        normalize_device(
+            {"phone_number": "+99999991000", "imsi": "not-an-imsi"},
+            idx=0,
+        )
 
 load_dotenv()
 

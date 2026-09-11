@@ -17,7 +17,6 @@ export const primaryNav: NavItem[] = [
   { label: "Investigation Queue", path: "/detections", title: "Investigation Queue", icon: ScanSearch },
   { label: "Assets", path: "/assets", title: "Asset Registry", icon: Cpu },
   { label: "Maintenance", path: "/maintenance", title: "Maintenance Center", icon: Wrench },
-  { label: "Integrations", path: "/integrations", title: "Integration Readiness", icon: Cable },
   { label: "Network Health", path: "/network", title: "Network Health", icon: Wifi },
   { label: "Analytics", path: "/analytics", title: "Analytics", icon: Activity },
   { label: "Agent Audit", path: "/agent-audit", title: "Agent Audit Trail", icon: ScrollText },
@@ -44,9 +43,6 @@ export function getPageTitle(pathname: string): string {
   }
   if (/^\/maintenance\/work-orders\/.+/.test(pathname)) {
     return "Work order details";
-  }
-  if (/^\/integrations\/runs\/.+/.test(pathname)) {
-    return "Agent run";
   }
   if (/^\/integrations\/findings\/.+/.test(pathname)) {
     return "Agent finding";

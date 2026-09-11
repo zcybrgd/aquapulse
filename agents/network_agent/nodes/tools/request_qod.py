@@ -1,5 +1,3 @@
-# agents/network_agent/nodes/tools/request_qod.py
-
 import os
 import re
 import logging
