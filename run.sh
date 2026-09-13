@@ -304,12 +304,12 @@ PY
 configure_nokia_network_health
 
 # ----------------------------------------------------------------------------
-# 4. Python Dependencies
+# 4. Dependencies (Python & Frontend)
 # ----------------------------------------------------------------------------
 
 if [[ "$INSTALL_DEPS" == true ]]; then
 
-    section "4. Checking Python dependencies"
+    section "4. Checking dependencies"
 
     if [[ ! -f "$REQUIREMENTS_FILE" ]]; then
         error "requirements.txt not found."
@@ -324,9 +324,19 @@ if [[ "$INSTALL_DEPS" == true ]]; then
 
     success "Python dependencies are ready."
 
+    # --- ADDED FRONTEND DEPENDENCIES HERE ---
+    log "Installing Frontend dependencies..."
+    (
+        cd "$FRONTEND_DIR"
+        npm install
+        npm install -D vitest
+    )
+
+    success "Frontend dependencies are ready."
+
 else
 
-    section "4. Python dependency installation skipped"
+    section "4. Dependency installation skipped"
 
     warning "Running with --no-install."
 
@@ -453,6 +463,17 @@ start_service \
     "Network Agent Listener" \
     "$ROOT_DIR" \
     env PYTHONPATH="$ROOT_DIR" NETWORK_AGENT_PORT="$NETWORK_AGENT_PORT" python "$NETWORK_AGENT_DIR/runner.py"
+
+
+# Response Agent API (Port 9002)
+start_service \
+    "Response Agent" \
+    "$RESPONSE_AGENT_DIR" \
+    env PYTHONPATH="$ROOT_DIR" uvicorn api:app \
+    --host 0.0.0.0 \
+    --port "$RESPONSE_AGENT_PORT" \
+    --reload
+
 
 
 # Platform frontend

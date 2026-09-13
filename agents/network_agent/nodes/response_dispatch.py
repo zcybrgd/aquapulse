@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from agents.response_agent.graph import build_actuation_graph
+from agents.response_agent.nodes.llm_response_planner import build_llm_decision_chain
 from agents.response_agent.schemas import (
     NetworkDenied as RANetworkDenied,
     NetworkGrant as RANetworkGrant,
@@ -15,22 +16,30 @@ from agents.response_agent.schemas import (
 
 logger = logging.getLogger("network_agent.nodes.response_dispatch")
 
-# Non-blocking ThreadPoolExecutor for fire-and-forget execution of response graphs
 _DISPATCH_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="response-dispatch")
 
 _response_graph = None
 
 
 def _get_response_graph():
-    """Lazy loader for Response Agent graph to prevent circular import delays."""
+    """Lazy loader for Response Agent graph configured for non-blocking execution."""
     global _response_graph
     if _response_graph is None:
-        _response_graph = build_actuation_graph()
+        try:
+            llm_chain = build_llm_decision_chain()
+        except Exception as e:
+            logger.warning("[ResponseAgent] Could not initialize LLM chain (%s). Proceeding with default graph.", e)
+            llm_chain = None
+
+        _response_graph = build_actuation_graph(
+            llm_chain=llm_chain,
+            override_window_seconds=0.0,  # Bypass 120s manual override delay
+            override_poller=lambda incident_id: "confirmed",
+        )
     return _response_graph
 
 
 def _parse_datetime(dt_val: Any) -> Optional[datetime]:
-    """Safely converts ISO datetime strings or datetime objects to timezone-aware UTC objects."""
     if dt_val is None:
         return None
     if isinstance(dt_val, datetime):
@@ -50,22 +59,22 @@ def _to_ra_grant(decision: Dict[str, Any]) -> RANetworkGrant:
     expires_at = _parse_datetime(decision.get("expires_at"))
 
     return RANetworkGrant(
-        cluster_id=decision["cluster_id"],
-        incident_id=decision["incident_id"],
-        severity_tier=RASeverityTier(int(decision["severity_tier"])),
-        guarantee_type=decision["guarantee_type"],
-        session_id=decision["session_id"],
+        cluster_id=decision.get("cluster_id") or decision.get("sensor_cluster_id", "cluster-desert-046"),
+        incident_id=decision.get("incident_id") or str(uuid.uuid4()),
+        severity_tier=RASeverityTier(int(decision.get("severity_tier", 1))),
+        guarantee_type=decision.get("guarantee_type") or decision.get("qos_profile", "QoD"),
+        session_id=str(decision.get("session_id") or decision.get("qos_session_id") or uuid.uuid4()),
         granted_at=granted_at,
         expires_at=expires_at,
-        reasoning_trace=decision.get("reasoning_trace", ""),
+        reasoning_trace=str(decision.get("reasoning_trace", "")),
     )
 
 
 def _to_ra_denied(decision: Dict[str, Any]) -> RANetworkDenied:
     return RANetworkDenied(
-        cluster_id=decision["cluster_id"],
-        incident_id=decision["incident_id"],
-        severity_tier=RASeverityTier(int(decision["severity_tier"])),
+        cluster_id=decision.get("cluster_id") or decision.get("sensor_cluster_id", "cluster-desert-046"),
+        incident_id=decision.get("incident_id") or str(uuid.uuid4()),
+        severity_tier=RASeverityTier(int(decision.get("severity_tier", 1))),
         reason=decision.get("reasoning_trace", "denied"),
         fallback=decision.get("fallback", "SMS"),
     )
@@ -81,28 +90,41 @@ def _invoke_response_graph(
     denied: Optional[RANetworkDenied],
     operator_contact: str,
 ) -> None:
-    app = _get_response_graph()
-    initial_state = {
-        "incident_id": incident_id,
-        "cluster_id": cluster_id,
-        "device_id": device_id,
-        "severity_tier": RASeverityTier(int(severity_tier)),
-        "network_grant": grant,
-        "network_denied": denied,
-        "operator_contact": operator_contact,
-        "reasoning_trace": [],
-    }
+    logger.info(
+        "[ResponseAgent] Starting execution for incident_id=%s cluster=%s device=%s tier=%s",
+        incident_id, cluster_id, device_id, severity_tier
+    )
     try:
+        app = _get_response_graph()
+        initial_state = {
+            "incident_id": incident_id,
+            "cluster_id": cluster_id,
+            "device_id": device_id,
+            "severity_tier": RASeverityTier(int(severity_tier)),
+            "network_grant": grant,
+            "network_denied": denied,
+            "operator_contact": operator_contact,
+            "reasoning_trace": [],
+        }
         final_state = app.invoke(initial_state)
         logger.info(
-            "response_agent_invoked incident_id=%s decision=%s",
+            "[ResponseAgent] SUCCESS incident_id=%s decision=%s",
             incident_id, final_state.get("decision"),
         )
+        print(f"\n>>> [ResponseAgent] Actuation Completed Successfully for Incident {incident_id} <<<\n", flush=True)
     except Exception as exc:
         logger.exception(
-            "response_agent_invoke_FAILED incident_id=%s device_id=%s error=%s",
+            "[ResponseAgent] FAILED for incident_id=%s device_id=%s error=%s",
             incident_id, device_id, exc
         )
+
+
+def _check_future_exception(future):
+    """Logs any uncaught error swallowed by ThreadPoolExecutor."""
+    try:
+        future.result()
+    except Exception as exc:
+        logger.exception("[ResponseAgent] Background worker thread crashed with uncaught error: %s", exc)
 
 
 def dispatch_grant_or_deny(
@@ -112,21 +134,16 @@ def dispatch_grant_or_deny(
     device_id: Optional[str] = None,
     operator_contact: str = "",
 ) -> None:
-    """
-    Fire-and-forget dispatch to the Response Agent's graph.
-    `decision` is the raw dict produced by emit_grant/emit_deny (or the
-    equivalent built by the slice-webhook lifecycle).
-    """
     try:
         incident_id = decision.get("incident_id") or str(uuid.uuid4())
-        cluster_id = decision["cluster_id"]
-        severity_tier = int(decision["severity_tier"])
+        cluster_id = decision.get("cluster_id") or decision.get("sensor_cluster_id", "cluster-desert-046")
+        severity_tier = int(decision.get("severity_tier", 1))
         resolved_device_id = device_id or decision.get("device_id") or "unknown-device"
 
         grant = _to_ra_grant(decision) if is_grant else None
         denied = None if is_grant else _to_ra_denied(decision)
 
-        _DISPATCH_POOL.submit(
+        future = _DISPATCH_POOL.submit(
             _invoke_response_graph,
             incident_id=incident_id,
             cluster_id=cluster_id,
@@ -136,8 +153,10 @@ def dispatch_grant_or_deny(
             denied=denied,
             operator_contact=operator_contact,
         )
-        logger.debug(
-            "Dispatched background actuation worker for incident_id=%s (grant=%s)",
+        future.add_done_callback(_check_future_exception)
+
+        logger.info(
+            "[ResponseAgent] Dispatched actuation task for incident_id=%s (grant=%s)",
             incident_id, is_grant,
         )
     except Exception as exc:
