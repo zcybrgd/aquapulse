@@ -79,30 +79,7 @@ WEBHOOK_URL="https://a1b2-34-56-78-90.ngrok-free.app"
 *Verification:* Ping the ngrok URL in your browser or run `curl -I https://<YOUR-NGROK-URL>.ngrok-free.app` to verify the tunnel resolves.
 
 
-3. **Initialize Database & Migration Seeds:** First-time setup.
-Start the PostgreSQL/TimescaleDB container and apply Alembic migrations:
-
-```bash
-# 1. Start database container
-cd plateform
-docker compose up -d aquapulse-db
-cd ..
-
-# 2. Run backend migrations and seed data
-cd plateform/backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head
-python -m app.scripts.seed_database
-cd ../..
-
-```
-
-*Verification:* Run `docker ps` and confirm the `aquapulse-db` container shows status `Up (healthy)`.
-
-
-4. **Launch AquaPulse Core Stack:** Master Script.
+3. **Launch AquaPulse Core Stack:** Master Script.
 Grant execution permissions to `run.sh` and execute the master launcher from the repository root:
 
 ```bash
