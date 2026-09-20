@@ -1,3 +1,4 @@
 RAPIDAPI_KEY=
 RAPIDAPI_HOST=network-as-code.nokia.rapidapi.com
 GROQ_API_KEY=
+REDIS_URL="redis://127.0.0.1:6380/0"

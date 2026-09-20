@@ -16,6 +16,7 @@ from .nodes.release_network import make_release_network_node
 from .tools.network_release_agent import NetworkReleaseClient
 from .nodes.publish_to_platform import make_publish_to_platform_node
 from .tools.aquapulse_client import AquaPulsePlatformClient
+
 logger = logging.getLogger("actuation_agent.graph")
 
 def jsonl_audit_sink(path: str = "audit_log.jsonl") -> Callable[[AuditLogEntry], None]:
@@ -26,6 +27,7 @@ def jsonl_audit_sink(path: str = "audit_log.jsonl") -> Callable[[AuditLogEntry],
 
 def noop_override_poller(incident_id: str) -> Optional[str]:
     return None
+
 def build_actuation_graph(
     reachability_client: Optional[DeviceReachabilityClient] = None,
     notification_client: Optional[NotificationClient] = None,
@@ -45,6 +47,7 @@ def build_actuation_graph(
     aquapulse_client = aquapulse_client or AquaPulsePlatformClient()
     audit_sink = audit_sink or jsonl_audit_sink()
     override_poller = override_poller or noop_override_poller
+
     graph = StateGraph(ActuationState)
     graph.add_node("reachability_check", make_reachability_check_node(reachability_client))
     graph.add_node("llm_response_planner", make_llm_decision_node(llm_chain))
@@ -53,6 +56,7 @@ def build_actuation_graph(
     graph.add_node("release_network", make_release_network_node(network_release_client))
     graph.add_node("audit_writer", make_audit_writer_node(audit_sink))
     graph.add_node("publish_to_platform", make_publish_to_platform_node(aquapulse_client))
+
     graph.set_entry_point("reachability_check")
     graph.add_edge("reachability_check", "llm_response_planner")
     graph.add_edge("llm_response_planner", "execute_response")
@@ -61,4 +65,5 @@ def build_actuation_graph(
     graph.add_edge("release_network", "audit_writer")
     graph.add_edge("audit_writer", "publish_to_platform")
     graph.add_edge("publish_to_platform", END)
+
     return graph.compile()
